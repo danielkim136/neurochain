@@ -392,11 +392,92 @@ def u3_table(m: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def u4_table(m: dict[str, Any]) -> str:
+    """Build the U4 results table from ``results/u4_metrics.json``."""
+    names = {
+        "nason": "Nason",
+        "nomad_session1": "NoMAD session 1",
+        "nomad_session2": "NoMAD session 2",
+    }
+    decoders = {
+        "ridge": "U3's ridge readout",
+        "wiener": "Wiener filter",
+        "kalman": "Kalman filter",
+        "gru": "GRU",
+    }
+    rows = {(r["dataset"], r["label"], r["decoder"]): r for r in m["results"]}
+
+    def score(row: dict[str, Any]) -> str:
+        return f"{row['r2']:.3f} [{row['r2_low']:.3f}, {row['r2_high']:.3f}]"
+
+    out: list[tuple[str, str, str]] = []
+    for name, head in m["headline"].items():
+        base_uw = rows[name, head["conventional"], "ridge"]["total_uw"]
+        best_uw = rows[name, head["winner"], "ridge"]["total_uw"]
+        for decoder, entry in head["decoders"].items():
+            diff = entry["winner_minus_conventional"]
+            out.append(
+                (
+                    f"{names.get(name, name)}, {decoders[decoder]}",
+                    f"R² {score(rows[name, head['conventional'], decoder])} at {base_uw:.2f} µW; "
+                    f"{score(rows[name, head['winner'], decoder])} at {best_uw:.2f} µW",
+                    f"conventional chain, then U3's choice ({head['winner']}); paired difference "
+                    f"{diff['difference']:+.3f} [{diff['low']:+.3f}, {diff['high']:+.3f}]",
+                )
+            )
+    first = next(iter(m["headline"]))
+    cheapest = min((r for r in m["results"] if r["dataset"] == first), key=lambda r: r["total_uw"])
+    for decoder in head["decoders"]:
+        row = rows[first, cheapest["label"], decoder]
+        out.append(
+            (
+                f"{names.get(first, first)}, {decoders[decoder]}, cheapest chain decoded",
+                f"R² {score(row)} at {row['total_uw']:.2f} µW",
+                cheapest["label"],
+            )
+        )
+    cross = m["cross_session"]
+    if cross:
+        for r in cross["rows"]:
+            out.append(
+                (
+                    f"Across sessions, {decoders[r['decoder']]}",
+                    f"R² {score(r)}",
+                    f"fitted on {names.get(r['train'], r['train'])}, tested on "
+                    f"{names.get(r['test'], r['test'])}, {cross['days_apart']:.0f} days apart, "
+                    "no recalibration",
+                )
+            )
+    for decoder, cost in m["decoder_cost"][first].items():
+        out.append(
+            (
+                f"Compute, {decoders[decoder]}",
+                f"{cost['multiplies_per_bin']} multiplies per bin, "
+                f"{cost['uw_per_channel']:.4f} µW per channel",
+                f"{names.get(first, first)}, 96 channels, 50 ms bins, 1 pJ per multiply, if run on "
+                "the implant",
+            )
+        )
+    cfg = m["config"]
+    out.append(
+        (
+            "Evaluation",
+            f"{cfg['n_folds']} folds, {cfg['n_boot']} bootstrap resamples, seed {cfg['seed']}",
+            "folds are contiguous blocks of trials; intervals are 95 %, from resampling trials "
+            "(NoMAD: recording segments)",
+        )
+    )
+    lines = ["| Quantity | Value | How it is defined |", "|---|---|---|"]
+    lines += [f"| {name} | {value} | {note} |" for name, value, note in out]
+    return "\n".join(lines)
+
+
 TABLES = {
     "U0_RESULTS": ("u0_metrics.json", u0_table),
     "U1_RESULTS": ("u1_metrics.json", u1_table),
     "U2_RESULTS": ("u2_metrics.json", u2_table),
     "U3_RESULTS": ("u3_metrics.json", u3_table),
+    "U4_RESULTS": ("u4_metrics.json", u4_table),
 }
 
 

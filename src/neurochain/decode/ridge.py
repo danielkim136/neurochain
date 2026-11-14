@@ -11,7 +11,7 @@ and inflate every score.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -130,3 +130,92 @@ def blocked_cross_validation(
     return CrossValidation(
         np.asarray(r2, dtype=np.float64), np.asarray(correlation, dtype=np.float64)
     )
+
+
+@dataclass
+class RidgeDecoder:
+    """The lagged ridge readout as a decoder object.
+
+    Attributes:
+        n_lags: Bins of history per prediction, the current one included.
+        alpha: Ridge penalty.
+    """
+
+    n_lags: int = 5
+    alpha: float = 0.01
+
+    def fit(self, features: FloatArray, targets: FloatArray, groups: IntArray) -> None:
+        """Fit the weights on lagged features."""
+        x = lagged(features, groups, self.n_lags)
+        self._intercept = targets.mean(axis=0)
+        gram = x.T @ x + self.alpha * x.shape[0] * np.eye(x.shape[1])
+        self._weights = np.linalg.solve(gram, x.T @ (targets - self._intercept))
+
+    def predict(self, features: FloatArray, groups: IntArray) -> FloatArray:
+        """Return decoded behaviour, ``(n_bins, n_targets)``."""
+        prediction = lagged(features, groups, self.n_lags) @ self._weights + self._intercept
+        return np.asarray(prediction, dtype=np.float64)
+
+
+@dataclass
+class WienerDecoder:
+    """A ridge readout with long history and a penalty chosen by cross-validation.
+
+    The same linear map as :class:`RidgeDecoder`, but tuned the way the other
+    decoders are: it sees ``n_lags`` bins of history (about a second), and the
+    penalty that keeps that many weights from fitting noise is chosen on
+    contiguous blocks of the training trials. In the BCI literature a linear
+    filter over lagged features is called a Wiener filter.
+
+    Choosing the penalty costs one eigendecomposition per block: with
+    ``G = V diag(s) V'`` the ridge solution for every penalty is
+    ``V diag(1 / (s + penalty)) V' b``.
+
+    Attributes:
+        n_lags: Bins of history, including the current bin.
+        alphas: Penalties to choose between, as in :func:`fit_ridge`.
+        selection_folds: Blocks of training trials used to choose the penalty.
+        alpha: The penalty in use (set by :meth:`fit`).
+    """
+
+    n_lags: int = 20
+    alphas: tuple[float, ...] = (0.01, 0.1, 1.0, 10.0)
+    selection_folds: int = 3
+    alpha: float = 0.0
+    _weights: FloatArray = field(default_factory=lambda: np.empty(0), repr=False)
+    _intercept: FloatArray = field(default_factory=lambda: np.empty(0), repr=False)
+
+    def fit(self, features: FloatArray, targets: FloatArray, groups: IntArray) -> None:
+        """Choose the penalty on held-back training trials, then fit on all of them."""
+        x = lagged(features, groups, self.n_lags)
+        self._intercept = targets.mean(axis=0)
+        y = targets - self._intercept
+        labels = np.unique(groups)
+        blocks = [
+            np.isin(groups, block)
+            for block in np.array_split(labels, min(self.selection_folds, len(labels)))
+        ]
+        grams = [x[held].T @ x[held] for held in blocks]
+        moments = [x[held].T @ y[held] for held in blocks]
+        gram, moment = np.sum(grams, axis=0), np.sum(moments, axis=0)
+        if len(self.alphas) > 1:
+            errors = np.zeros(len(self.alphas))
+            for held, held_gram, held_moment in zip(blocks, grams, moments, strict=True):
+                values, vectors = np.linalg.eigh(gram - held_gram)
+                projected = vectors.T @ (moment - held_moment)
+                n_train = len(x) - int(held.sum())
+                for position, alpha in enumerate(self.alphas):
+                    weights = vectors @ (projected / (values + alpha * n_train)[:, np.newaxis])
+                    errors[position] += float(np.sum((x[held] @ weights - y[held]) ** 2))
+            self.alpha = self.alphas[int(np.argmin(errors))]
+        else:
+            self.alpha = self.alphas[0]
+        penalty = self.alpha * len(x) * np.eye(x.shape[1])
+        self._weights = np.linalg.solve(gram + penalty, moment)
+
+    def predict(self, features: FloatArray, groups: IntArray) -> FloatArray:
+        """Return decoded behaviour, ``(n_bins, n_targets)``."""
+        return np.asarray(
+            lagged(features, groups, self.n_lags) @ self._weights + self._intercept,
+            dtype=np.float64,
+        )

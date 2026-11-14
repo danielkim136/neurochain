@@ -84,6 +84,22 @@ well while the implant is stimulating and its electrodes are aging?
    next.
 4. Cite every paper relied on in `docs/references.md`, with a link.
 
+## Session economy
+
+Cost follows the number of tool calls times the context each one re-reads, so:
+
+- One unit per session. Start a fresh chat for the next unit; the state lives in
+  `TODO.md`, the design notes, `results/*.json` and the session memory, not in
+  the old transcript.
+- Batch: write the files, then lint and test in one command.
+- Look at a figure through a downscaled copy
+  (`sips -Z 900 figures/x.png --out <scratchpad>/x.png`), once per layout change.
+- Grep for what is needed; do not print whole files or whole result tables.
+- README prose, TODO ticks and other housekeeping go to a cheaper model as one
+  aggregated prompt. Generated tables (`make readme`) stay with the build.
+
+None of this relaxes the rules above.
+
 ## Commands
 
 ```

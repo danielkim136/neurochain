@@ -260,6 +260,40 @@ detector was not retuned for each ADC setting. More in
 | Bridge check at 0.5 µA | crossings r = 0.28 measured, 0.25 predicted; SBP 0.968 and 0.979 | on MEArec, where the cheaper chain can be simulated directly; crossings against true spike counts, SBP against the reference chain's |
 <!-- END U3_RESULTS -->
 
+<!-- BEGIN U4_RESULTS -->
+| Quantity | Value | How it is defined |
+|---|---|---|
+| Nason, U3's ridge readout | R² 0.471 [0.446, 0.495] at 19.63 µW; 0.438 [0.412, 0.463] at 0.48 µW | conventional chain, then U3's choice (sbp, 0.25 µA, 8 b, 2 kS/s); paired difference -0.033 [-0.057, -0.010] |
+| Nason, Wiener filter | R² 0.478 [0.458, 0.497] at 19.63 µW; 0.472 [0.446, 0.496] at 0.48 µW | conventional chain, then U3's choice (sbp, 0.25 µA, 8 b, 2 kS/s); paired difference -0.006 [-0.027, +0.015] |
+| Nason, Kalman filter | R² 0.363 [0.337, 0.389] at 19.63 µW; 0.342 [0.314, 0.368] at 0.48 µW | conventional chain, then U3's choice (sbp, 0.25 µA, 8 b, 2 kS/s); paired difference -0.021 [-0.045, +0.003] |
+| Nason, GRU | R² 0.713 [0.689, 0.737] at 19.63 µW; 0.720 [0.695, 0.744] at 0.48 µW | conventional chain, then U3's choice (sbp, 0.25 µA, 8 b, 2 kS/s); paired difference +0.007 [-0.015, +0.032] |
+| NoMAD session 2, U3's ridge readout | R² 0.538 [0.413, 0.632] at 19.63 µW; 0.510 [0.393, 0.598] at 3.43 µW | conventional chain, then U3's choice (crossings, 1 µA, 10 b, 30 kS/s); paired difference -0.028 [-0.035, -0.020] |
+| NoMAD session 2, Wiener filter | R² 0.650 [0.547, 0.726] at 19.63 µW; 0.632 [0.535, 0.703] at 3.43 µW | conventional chain, then U3's choice (crossings, 1 µA, 10 b, 30 kS/s); paired difference -0.018 [-0.023, -0.012] |
+| NoMAD session 2, Kalman filter | R² 0.653 [0.540, 0.737] at 19.63 µW; 0.637 [0.526, 0.718] at 3.43 µW | conventional chain, then U3's choice (crossings, 1 µA, 10 b, 30 kS/s); paired difference -0.015 [-0.020, -0.011] |
+| NoMAD session 2, GRU | R² 0.655 [0.514, 0.746] at 19.63 µW; 0.643 [0.521, 0.725] at 3.43 µW | conventional chain, then U3's choice (crossings, 1 µA, 10 b, 30 kS/s); paired difference -0.012 [-0.026, +0.006] |
+| NoMAD session 1, U3's ridge readout | R² 0.305 [0.271, 0.347] at 19.63 µW; 0.294 [0.260, 0.335] at 4.07 µW | conventional chain, then U3's choice (crossings, 2 µA, 8 b, 30 kS/s); paired difference -0.011 [-0.016, -0.007] |
+| NoMAD session 1, Wiener filter | R² 0.539 [0.517, 0.566] at 19.63 µW; 0.532 [0.510, 0.560] at 4.07 µW | conventional chain, then U3's choice (crossings, 2 µA, 8 b, 30 kS/s); paired difference -0.007 [-0.008, -0.005] |
+| NoMAD session 1, Kalman filter | R² 0.623 [0.591, 0.643] at 19.63 µW; 0.619 [0.588, 0.638] at 4.07 µW | conventional chain, then U3's choice (crossings, 2 µA, 8 b, 30 kS/s); paired difference -0.004 [-0.006, -0.002] |
+| NoMAD session 1, GRU | R² 0.565 [0.547, 0.591] at 19.63 µW; 0.569 [0.550, 0.594] at 4.07 µW | conventional chain, then U3's choice (crossings, 2 µA, 8 b, 30 kS/s); paired difference +0.003 [-0.002, +0.009] |
+| Nason, U3's ridge readout, cheapest chain decoded | R² 0.322 [0.288, 0.352] at 0.12 µW | sbp, 0.05 µA, 8 b, 2 kS/s |
+| Nason, Wiener filter, cheapest chain decoded | R² 0.341 [0.318, 0.363] at 0.12 µW | sbp, 0.05 µA, 8 b, 2 kS/s |
+| Nason, Kalman filter, cheapest chain decoded | R² 0.220 [0.189, 0.248] at 0.12 µW | sbp, 0.05 µA, 8 b, 2 kS/s |
+| Nason, GRU, cheapest chain decoded | R² 0.643 [0.608, 0.677] at 0.12 µW | sbp, 0.05 µA, 8 b, 2 kS/s |
+| Across sessions, U3's ridge readout | R² -0.018 [-0.058, 0.006] | fitted on NoMAD session 2, tested on NoMAD session 1, 274 days apart, no recalibration |
+| Across sessions, Wiener filter | R² 0.239 [0.227, 0.248] | fitted on NoMAD session 2, tested on NoMAD session 1, 274 days apart, no recalibration |
+| Across sessions, Kalman filter | R² 0.119 [0.094, 0.140] | fitted on NoMAD session 2, tested on NoMAD session 1, 274 days apart, no recalibration |
+| Across sessions, GRU | R² 0.131 [0.121, 0.141] | fitted on NoMAD session 2, tested on NoMAD session 1, 274 days apart, no recalibration |
+| Across sessions, U3's ridge readout | R² -0.070 [-0.143, -0.010] | fitted on NoMAD session 1, tested on NoMAD session 2, 274 days apart, no recalibration |
+| Across sessions, Wiener filter | R² 0.245 [0.184, 0.292] | fitted on NoMAD session 1, tested on NoMAD session 2, 274 days apart, no recalibration |
+| Across sessions, Kalman filter | R² 0.092 [-0.039, 0.188] | fitted on NoMAD session 1, tested on NoMAD session 2, 274 days apart, no recalibration |
+| Across sessions, GRU | R² 0.079 [0.063, 0.094] | fitted on NoMAD session 1, tested on NoMAD session 2, 274 days apart, no recalibration |
+| Compute, U3's ridge readout | 480 multiplies per bin, 0.0001 µW per channel | Nason, 96 channels, 50 ms bins, 1 pJ per multiply, if run on the implant |
+| Compute, Wiener filter | 960 multiplies per bin, 0.0002 µW per channel | Nason, 96 channels, 50 ms bins, 1 pJ per multiply, if run on the implant |
+| Compute, Kalman filter | 196 multiplies per bin, 0.0000 µW per channel | Nason, 96 channels, 50 ms bins, 1 pJ per multiply, if run on the implant |
+| Compute, GRU | 30784 multiplies per bin, 0.0064 µW per channel | Nason, 96 channels, 50 ms bins, 1 pJ per multiply, if run on the implant |
+| Evaluation | 5 folds, 1000 bootstrap resamples, seed 0 | folds are contiguous blocks of trials; intervals are 95 %, from resampling trials (NoMAD: recording segments) |
+<!-- END U4_RESULTS -->
+
 ## Reproduce
 
 Requires [uv](https://docs.astral.sh/uv/) and `make`. Python 3.12 is installed

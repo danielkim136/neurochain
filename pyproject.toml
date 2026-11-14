@@ -9,6 +9,7 @@ dependencies = [
     "numpy>=2.0",
     "pynwb>=4.2.0",
     "scipy>=1.13",
+    "torch>=2.15.0",
 ]
 
 [project.scripts]
@@ -27,6 +28,15 @@ sim = [
     "mearec>=1.11.0",
     "neuron>=9.0.2",
 ]
+
+# On Linux (CI) take the CPU-only PyTorch build; the default wheel bundles CUDA.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
 
 [build-system]
 requires = ["hatchling"]
