@@ -1,13 +1,11 @@
 from pathlib import Path
 
-import numpy as np
 import pytest
 
 from neurochain.adc import Adc
 from neurochain.analysis import u2
 from neurochain.analysis.u2_plots import plot_adc, plot_detection, plot_fixed_point
-from neurochain.data.mearec import MearecRecording
-from neurochain.data.synthetic import make_synthetic_recording, spike_template
+from neurochain.data.mearec import synthetic_recording as synthetic_mearec
 
 FS_HZ = 30_000.0
 SMALL = u2.U2Config(
@@ -22,32 +20,6 @@ SMALL = u2.U2Config(
     guard_bits_options=(0, 6),
     max_workers=1,
 )
-
-
-def synthetic_mearec(n_channels: int = 2, seconds: float = 8.0) -> MearecRecording:
-    """Build a small recording with the real one's structure: one 100 µV unit per channel."""
-    rng = np.random.default_rng(0)
-    template, _ = spike_template(FS_HZ)
-    clean, spikes, templates = [], [], []
-    for channel in range(n_channels):
-        recording, truth = make_synthetic_recording(
-            duration_s=seconds, fs_hz=FS_HZ, amplitudes=(100.0,), rates_hz=(12.0,),
-            noise_rms=0.0, lfp_rms=0.0, seed=channel,
-        )  # fmt: skip
-        clean.append(recording.channel(0))
-        spikes.append(truth.spike_samples[0])
-        row = np.zeros((n_channels, template.size))
-        row[channel] = 100.0 * template
-        templates.append(row)
-    background = rng.standard_normal((n_channels, round(seconds * FS_HZ)))
-    return MearecRecording(
-        fs_hz=FS_HZ,
-        clean_uv=np.stack(clean),
-        background_uv=background / np.sqrt(7200 / 15_000),
-        spike_samples=tuple(spikes),
-        templates_uv=np.stack(templates),
-        cell_types=("E",) * n_channels,
-    )
 
 
 @pytest.fixture(scope="module")

@@ -35,6 +35,10 @@ COLOR_ACCENT = "#1baf7a"  # aqua, for a third series when one is needed
 # stay distinguishable in every pairing, so no figure uses more than three.
 SERIES = (COLOR_LFP, COLOR_SPIKE, COLOR_ACCENT)
 
+# A fourth colour, for stacked bars only: next to the third it stays distinct,
+# but it must not be used for scattered points alongside the second.
+SERIES_STACK = (*SERIES, "#eda100")
+
 DPI = 200
 
 

@@ -145,3 +145,43 @@ def load_mearec(path: Path | None = None) -> MearecRecording:
             templates_uv=stored["templates_uv"].astype(np.float64),
             cell_types=tuple(str(c) for c in stored["cell_types"]),
         )
+
+
+def synthetic_recording(
+    n_channels: int = 2, duration_s: float = 8.0, fs_hz: float = 30_000.0, seed: int = 0
+) -> MearecRecording:
+    """Build a small stand-in with the real recording's structure, for tests.
+
+    One 100 µV unit per channel firing at about 12 Hz, and a white background.
+    It needs neither MEArec nor a generated file.
+    """
+    from neurochain.data.synthetic import make_synthetic_recording, spike_template
+
+    rng = np.random.default_rng(seed)
+    template, _ = spike_template(fs_hz)
+    clean, spikes, templates = [], [], []
+    for channel in range(n_channels):
+        recording, truth = make_synthetic_recording(
+            duration_s=duration_s,
+            fs_hz=fs_hz,
+            amplitudes=(100.0,),
+            rates_hz=(12.0,),
+            noise_rms=0.0,
+            lfp_rms=0.0,
+            seed=seed * 1000 + channel,
+        )
+        clean.append(recording.channel(0))
+        spikes.append(truth.spike_samples[0])
+        row = np.zeros((n_channels, template.size))
+        row[channel] = 100.0 * template
+        templates.append(row)
+    background = rng.standard_normal((n_channels, round(duration_s * fs_hz)))
+    in_band = (SPIKE_BAND_HZ[1] - SPIKE_BAND_HZ[0]) / (fs_hz / 2.0)
+    return MearecRecording(
+        fs_hz=fs_hz,
+        clean_uv=np.stack(clean),
+        background_uv=background / np.sqrt(in_band),
+        spike_samples=tuple(spikes),
+        templates_uv=np.stack(templates),
+        cell_types=("E",) * n_channels,
+    )

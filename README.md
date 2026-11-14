@@ -242,6 +242,24 @@ and little LFP, the 50 µV target cut-off is a choice that moves F1, and the NEO
 detector was not retuned for each ADC setting. More in
 [docs/U2_design.md](docs/U2_design.md#limitations).
 
+<!-- BEGIN U3_RESULTS -->
+| Quantity | Value | How it is defined |
+|---|---|---|
+| Design space | 115 configurations, 36 more infeasible | feature x amplifier current x ADC bits x sample rate; infeasible means the wideband amplifier cannot reach 7.5 kHz at that current |
+| Power model constants | 1.8 V, NEF 4, 50 fJ/step, 1 pJ/multiply, 10 pJ/bit | assumptions, with sources in docs/U3_design.md |
+| Nason, finger velocity: conventional chain | R² 0.462 at 19.63 µW | crossings, 10 µA, 10 b, 30 kS/s |
+| Nason, finger velocity: cheapest within 5% | R² 0.444 at 0.48 µW (40.6 times less) | SBP, 0.25 µA, 8 b, 2 kS/s |
+| Nason, finger velocity: most accurate | R² 0.519 at 19.81 µW | both, 10 µA, 10 b, 30 kS/s |
+| NoMAD session 1, cursor velocity: conventional chain | R² 0.336 at 19.63 µW | crossings, 10 µA, 10 b, 30 kS/s |
+| NoMAD session 1, cursor velocity: cheapest within 5% | R² 0.324 at 4.07 µW (4.8 times less) | crossings, 2 µA, 8 b, 30 kS/s |
+| NoMAD session 2, cursor velocity: conventional chain | R² 0.571 at 19.63 µW | crossings, 10 µA, 10 b, 30 kS/s |
+| NoMAD session 2, cursor velocity: cheapest within 5% | R² 0.543 at 3.43 µW (5.7 times less) | crossings, 1 µA, 10 b, 30 kS/s |
+| Streaming every sample instead | 22.54 µW, of which 3.00 µW is radio | 300 kbit/s per channel, against 240 bit/s for the cheapest match |
+| Fixed decoder across the two NoMAD sessions | R² -0.01 and -0.07 | trained on one, tested on the other, 274 days apart, no recalibration |
+| Samples of a real channel outside the ±1 mV ADC range | 6.4% wideband; 0.00% through the 300 Hz to 1 kHz amplifier | Nason in-vivo broadband, RMS 972 µV; the wideband chain would need more range, hence more bits |
+| Bridge check at 0.5 µA | crossings r = 0.28 measured, 0.25 predicted; SBP 0.968 and 0.979 | on MEArec, where the cheaper chain can be simulated directly; crossings against true spike counts, SBP against the reference chain's |
+<!-- END U3_RESULTS -->
+
 ## Reproduce
 
 Requires [uv](https://docs.astral.sh/uv/) and `make`. Python 3.12 is installed

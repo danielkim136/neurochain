@@ -1,6 +1,6 @@
 # NeuroChain: one command per result. Run `make help` for the list.
 .DEFAULT_GOAL := help
-.PHONY: help setup data data-status data-describe mearec u0 u1 u1-key u2 u2-key u0-key readme test test-fast lint format clean
+.PHONY: help setup data data-status data-describe mearec u0 u1 u1-key u2 u2-key u3 u3-key u0-key readme test test-fast lint format clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-12s %s\n", $$1, $$2}'
@@ -46,6 +46,14 @@ u2: ## U2: ADC and feature figures, metrics and the README table (needs `make me
 
 u2-key: ## U2: print the key numbers (add ARGS="--bits 6" to change a setting)
 	uv run python scripts/u2_key_number.py $(ARGS)
+
+u3: ## U3: the accuracy-vs-power sweep, figures, metrics and README table (about four minutes)
+	uv run python scripts/u3_figures.py
+	uv run python scripts/update_readme.py
+	uv run python scripts/u3_key_number.py
+
+u3-key: ## U3: print the key numbers (add ARGS="--nef 2" to change a power constant)
+	uv run python scripts/u3_key_number.py $(ARGS)
 
 readme: ## Regenerate the README results tables from results/*.json
 	uv run python scripts/update_readme.py

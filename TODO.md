@@ -98,7 +98,8 @@ Key number: front-end noise floor 3.41 µV rms in the spike band (electrode
 
 Carried forward from U1:
 
-- [ ] **No public dataset here has both broadband and behaviour.** The emulator
+- [x] **No public dataset here has both broadband and behaviour.** (Resolved in
+      U3 by the feature-level bridge, `neurochain.bridge`.) The emulator
       needs a signal in microvolts. Neuralink is broadband without a voltage
       scale or behaviour; Nason's behaviour file and NoMAD hold features, not
       broadband. So the front end cannot simply be swept in front of a decoder.
@@ -106,7 +107,8 @@ Carried forward from U1:
       features (threshold crossings, SBP) on broadband with ground truth
       (MEArec, Nason in vivo), then apply that change to the feature datasets.
       Decide this at the start of U3, or find a dataset that has both.
-- [ ] **U3 must include neural background noise.** In vivo the noise is four
+- [x] **U3 must include neural background noise.** (Done: the bridge is
+      measured at 13 µV of background.) In vivo the noise is four
       times the front end's floor, and a quarter of the bias current costs 4 %
       in σ. A power model that sees only front-end noise would overspend on the
       amplifier.
@@ -143,14 +145,16 @@ at 30 kS/s and 10 bits, and still 0.61 at 6 bits or at 10 kS/s.
 
 Carried forward from U2:
 
-- [ ] **The ADC's input range has to be chosen on real data.** MEArec has almost
+- [x] **The ADC's input range has to be chosen on real data.** (U3 measured it:
+      6.4 % of the Nason channel's samples fall outside ±1 mV on the wideband
+      chain, none on the narrowband one.) MEArec has almost
       no LFP. The Nason broadband has an RMS of 972 µV, which would clip the
       ±1 mV range used here. U3 must choose range and analog high-pass corner
       together: U1 showed a 300 Hz analog corner costs 12 % in amplifier noise.
 - [ ] **NEO was not retuned per ADC setting**, which is why its sweep curves are
       irregular. If U3 keeps NEO as a candidate, tune its factor at each sample
       rate and resolution. On F1 it has not beaten the plain threshold.
-- [ ] **U3's bridge from front end to decoder** (see U1's carried-forward item):
+- [x] **U3's bridge from front end to decoder** (see U1's carried-forward item):
       U2 gives the first half. Detection F1 and feature tracking are now known
       as functions of noise, bits and sample rate. The second half is turning
       those into a change in the Nason and NoMAD features.
@@ -162,13 +166,46 @@ Carried forward from U2:
       copy under `data/mearec/` by `scripts/make_mearec.py`. If MEArec or NEURON
       change version, check the patch still applies.
 
-## U3: power model and co-design (A)
+## U3: power model and co-design (A) — DONE
 
 Done-criterion: accuracy-versus-µW Pareto plot on held-out sessions.
 
-- [ ] Per-stage power model: LNA, ADC, DSP, link at a stated pJ/bit
-- [ ] Sweep or optimise configurations
-- [ ] `docs/U3_design.md`, key-number script, three prediction checks
+- [x] Per-stage power model: amplifier, ADC, digital logic, radio, with stated
+      constants (`neurochain.power`)
+- [x] Bridge from a chain configuration to a change in recorded features,
+      measured on MEArec and checked there (`neurochain.bridge`)
+- [x] Sweep of 151 configurations (36 infeasible), decoded on the Nason online
+      data and both NoMAD sessions with blocked cross-validation
+- [x] Pareto plot, power breakdown and bridge figures; `results/u3_metrics.json`;
+      README table; `docs/U3_design.md` with four prediction checks; `make u3-key`
+
+Key number: 0.48 µW per channel (SBP, 250 nA amplifier, 8 bits, 2 kS/s) decodes
+finger velocity within 5 % of a 19.6 µW conventional chain.
+
+Qualification on the done-criterion: "held-out" is held-out blocks of trials
+within a session. Across the two NoMAD sessions a fixed decoder scores R² of
+about zero.
+
+Carried forward from U3:
+
+- [ ] **The winning path for RTL (U7) is SBP:** narrowband amplifier, 8-bit ADC
+      at 2 kS/s, high-pass, absolute value, sum over 50 ms. Its fixed-point
+      parameters are in U2's carried-forward list.
+- [ ] **The amplifier is 93 % of the winner's power.** Further savings need a
+      lower NEF, not a better ADC or radio. U5 and U6 should report their costs
+      in the same µW terms so they can be added to this budget.
+- [ ] **NEF is assumed constant from 25 nA to 20 µA.** Check the 250 nA operating
+      point against a published sub-microwatt amplifier before quoting 0.48 µW
+      outside this project.
+- [ ] **The bridge was checked at one current (0.5 µA) on simulated data.** It is
+      slightly pessimistic for crossings and slightly optimistic for SBP.
+- [ ] **U4 must repeat the SBP-versus-crossings comparison with the Kalman
+      filter and GRU**, at least at the conventional chain and the winner.
+- [ ] **U6: a fixed decoder does not transfer across NoMAD's sessions**
+      (R² -0.01 and -0.07). No front-end choice fixes that.
+- [ ] **The wideband chain's ADC range is too small for real LFP**, which the
+      sweep did not charge it for. A fair crossings chain needs either more bits
+      or a higher analog corner.
 
 ## U4: decoders and evaluation
 

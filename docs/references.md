@@ -95,6 +95,19 @@ first uses them. DOIs were resolved on 2026-11-13.
 - **Nason, S. R. et al. (2020)** (listed under U0). The spiking-band power recipe
   and the data it is reproduced on.
 
+## U3: power model and co-design
+
+- **van Elzakker, M. et al. (2010).** A 10-bit charge-redistribution ADC
+  consuming 1.9 µW at 1 MS/s. *IEEE Journal of Solid-State Circuits* 45(5),
+  1007-1015. <https://doi.org/10.1109/JSSC.2010.2043893>. The 4.4 fJ per
+  conversion step benchmark; the power model assumes ten times that.
+- **Sen, S., Chatterjee, B., Barik, G. and Roy, A. (2026).** Bidirectional
+  wireless communication for weakly coupled implantable brain-computer
+  interfaces. <https://arxiv.org/abs/2609.05786>. The sub-10 pJ/bit target used
+  for the radio, and the roughly 10 mW a link can dissipate.
+- **Karpowicz, B. M. et al. (2025)** (listed below). The NoMAD data the Pareto
+  is also evaluated on.
+
 ## Later units (listed in the plan, not yet relied on)
 
 - **Karpowicz, B. M. et al. (2025).** Stabilizing brain-computer interfaces

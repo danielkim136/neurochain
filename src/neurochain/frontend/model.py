@@ -246,8 +246,18 @@ class FrontEnd:
         return replace(self, lna=lna)
 
 
+class BandwidthError(ValueError):
+    """The amplifier cannot reach the requested bandwidth at its supply current."""
+
+
 def _solve_load(lna: Lna, f_high_hz: float, temperature_k: float) -> Lna:
-    """Choose the load capacitor that gives ``f_high_hz`` with an ideal source."""
+    """Choose the load capacitor that gives ``f_high_hz`` with an ideal source.
+
+    Raises:
+        BandwidthError: If even a negligible load leaves the bandwidth short.
+            The feedback network itself loads the OTA, so a given ``gm`` (set
+            by the supply current) has a largest reachable bandwidth.
+    """
     feedback_factor = lna.c2_f / (lna.c1_f + lna.c2_f + lna.c_in_f)
     estimate = lna.gm_s(temperature_k) * feedback_factor / (2.0 * np.pi * f_high_hz)
 
@@ -255,7 +265,14 @@ def _solve_load(lna: Lna, f_high_hz: float, temperature_k: float) -> Lna:
         trial = FrontEnd(replace(lna, c_load_f=float(np.exp(log_c))), None, temperature_k)
         return trial.f_high_hz - f_high_hz
 
-    log_c = optimize.brentq(error, np.log(estimate / 10.0), np.log(estimate * 10.0), rtol=1e-10)
+    smallest = np.log(1.0e-18)
+    reachable = error(smallest) + f_high_hz
+    if reachable <= f_high_hz:
+        raise BandwidthError(
+            f"at {lna.i_total_a * 1e6:g} µA the amplifier reaches at most {reachable:.0f} Hz, "
+            f"short of the {f_high_hz:.0f} Hz requested"
+        )
+    log_c = optimize.brentq(error, smallest, np.log(estimate * 10.0), rtol=1e-10)
     return replace(lna, c_load_f=float(np.exp(log_c)))
 
 
@@ -281,6 +298,9 @@ def design_lna(
         nef: Noise efficiency factor.
         temperature_k: Operating temperature.
         base: Amplifier to take the remaining parameters from.
+
+    Raises:
+        BandwidthError: If the supply current is too low for the bandwidth.
     """
     lna = replace(base or Lna(), i_total_a=i_total_a, nef=nef).with_f_low(f_low_hz)
     return _solve_load(lna, f_high_hz, temperature_k)

@@ -96,6 +96,8 @@ make u1-key    # U1 key numbers; ARGS="--bias-scale 0.5" changes one parameter
 make mearec    # generate the MEArec ground-truth recording (optional `sim` dependency group)
 make u2        # U2 figures, metrics, README table (needs `make mearec` + Nason data)
 make u2-key    # U2 key numbers; ARGS="--bits 6" changes one setting
+make u3        # U3 sweep, figures, metrics, README table (about four minutes)
+make u3-key    # U3 key numbers; ARGS="--nef 2" changes a power-model constant
 make test      # pytest
 make lint      # ruff + mypy
 ```
@@ -157,6 +159,23 @@ Run Python through uv: `uv run python ...`, `uv run pytest`.
 - **Baseline ADC:** 30 kS/s, 10 bits, ±1 mV at the electrode.
 - **Heavy sweeps run in worker processes** (`U2Config.max_workers`); tests set
   it to 1.
+
+## Co-design conventions (set in U3)
+
+- **Power per channel** comes from `neurochain.power`: amplifier `V·I`, ADC
+  `FoM·2^bits·fs`, logic per multiply, radio per bit. The constants are
+  assumptions; conclusions must survive tenfold changes (`make u3-key`).
+- **Reference chain:** crossings, 10 µA, 10 bits, 30 kS/s (19.6 µW). Recorded
+  feature datasets are assumed to come from it.
+- **The bridge** (`neurochain.bridge`) carries a chain's effect onto recorded
+  features: crossings are thinned by the share of real spikes kept (measured on
+  MEArec against ground truth); SBP gets added noise power and jitter. Do not
+  judge a chain by its correlation with another chain's features: that
+  penalises being different, not being worse.
+- **Winning path:** SBP from a 300 Hz to 1 kHz amplifier at 250 nA, 8 bits,
+  2 kS/s: 0.48 µW per channel. This is what U7 implements.
+- **Held-out** means contiguous blocks of trials within a session. NoMAD's two
+  sessions do not support cross-session evaluation with a fixed decoder.
 
 ## Toolchain status
 

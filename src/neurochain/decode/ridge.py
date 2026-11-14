@@ -102,21 +102,31 @@ def blocked_cross_validation(
 
     Args:
         features: ``(n_bins, n_features)``.
-        target: ``(n_bins,)`` the quantity to decode.
+        target: ``(n_bins,)`` the quantity to decode, or ``(n_bins, n_targets)``
+            to decode several at once; scores are then averaged over targets
+            within each fold.
         groups: ``(n_bins,)`` trial label of each bin.
         n_folds: Number of contiguous blocks of trials.
         n_lags: Time steps of history given to the readout.
         alpha: Ridge penalty.
     """
     x = lagged(features, groups, n_lags)
+    y = target if target.ndim == 2 else target[:, np.newaxis]
     blocks = np.array_split(np.unique(groups), n_folds)
     r2, correlation = [], []
     for block in blocks:
         test = np.isin(groups, block)
         mean = x[~test].mean(axis=0)
         scale = x[~test].std(axis=0) + 1e-9
-        weights, intercept = fit_ridge((x[~test] - mean) / scale, target[~test], alpha)
+        x_train = (x[~test] - mean) / scale
+        intercept = y[~test].mean(axis=0)
+        gram = x_train.T @ x_train + alpha * x_train.shape[0] * np.eye(x.shape[1])
+        weights = np.linalg.solve(gram, x_train.T @ (y[~test] - intercept))
         prediction = (x[test] - mean) / scale @ weights + intercept
-        r2.append(r_squared(target[test], prediction))
-        correlation.append(float(np.corrcoef(prediction, target[test])[0, 1]))
-    return CrossValidation(np.asarray(r2), np.asarray(correlation))
+        r2.append(np.mean([r_squared(y[test][:, d], prediction[:, d]) for d in range(y.shape[1])]))
+        correlation.append(
+            np.mean([np.corrcoef(prediction[:, d], y[test][:, d])[0, 1] for d in range(y.shape[1])])
+        )
+    return CrossValidation(
+        np.asarray(r2, dtype=np.float64), np.asarray(correlation, dtype=np.float64)
+    )

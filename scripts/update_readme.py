@@ -287,10 +287,116 @@ def u2_table(m: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def u3_table(m: dict[str, Any]) -> str:
+    """Build the U3 results table from ``results/u3_metrics.json``."""
+    rows, cfg, check = m["configurations"], m["config"], m["bridge_check"]
+    power = cfg["power"]
+    names = {
+        "nason": "Nason, finger velocity",
+        "nomad_session1": "NoMAD session 1, cursor velocity",
+        "nomad_session2": "NoMAD session 2, cursor velocity",
+    }
+
+    def describe(row: dict[str, Any]) -> str:
+        feature = {"crossings": "crossings", "sbp": "SBP", "both": "both", "raw": "raw"}
+        return (
+            f"{feature[row['feature']]}, {row['i_total_ua']:g} µA, {row['bits']} b, "
+            f"{row['fs_hz'] / 1e3:g} kS/s"
+        )
+
+    out: list[tuple[str, str, str]] = [
+        (
+            "Design space",
+            f"{len(rows)} configurations, {len(m['infeasible'])} more infeasible",
+            "feature x amplifier current x ADC bits x sample rate; infeasible means the "
+            "wideband amplifier cannot reach 7.5 kHz at that current",
+        ),
+        (
+            "Power model constants",
+            f"{power['v_supply_v']:g} V, NEF {power['nef']:g}, {power['adc_fom_j'] * 1e15:g} "
+            f"fJ/step, {power['energy_per_multiply_j'] * 1e12:g} pJ/multiply, "
+            f"{power['energy_per_bit_j'] * 1e12:g} pJ/bit",
+            "assumptions, with sources in docs/U3_design.md",
+        ),
+    ]
+    for name, info in m["datasets"].items():
+        base, best = rows[info["baseline"]], rows[info["winner"]]
+        top = rows[info["most_accurate"]]
+        title = names.get(name, name)
+        out += [
+            (
+                f"{title}: conventional chain",
+                f"R² {info['baseline_r2']:.3f} at {base['total_uw']:.2f} µW",
+                describe(base),
+            ),
+            (
+                f"{title}: cheapest within {cfg['tolerance']:.0%}",
+                f"R² {best['r2'][name]['mean']:.3f} at {best['total_uw']:.2f} µW "
+                f"({base['total_uw'] / best['total_uw']:.1f} times less)",
+                describe(best),
+            ),
+        ]
+        if top["label"] != base["label"]:
+            out.append(
+                (
+                    f"{title}: most accurate",
+                    f"R² {top['r2'][name]['mean']:.3f} at {top['total_uw']:.2f} µW",
+                    describe(top),
+                )
+            )
+    raw = next((row for row in rows if row["feature"] == "raw"), None)
+    first = m["datasets"][next(iter(m["datasets"]))]
+    feature_bps = rows[first["winner"]]["bit_rate_bps"]
+    if raw is not None:
+        out.append(
+            (
+                "Streaming every sample instead",
+                f"{raw['total_uw']:.2f} µW, of which {raw['link_uw']:.2f} µW is radio",
+                f"{raw['bit_rate_bps'] / 1e3:g} kbit/s per channel, against {feature_bps:g} bit/s "
+                "for the cheapest match",
+            )
+        )
+    cross = m["cross_session"]
+    if cross is not None:
+        out.append(
+            (
+                "Fixed decoder across the two NoMAD sessions",
+                f"R² {cross['train_early_test_late']:.2f} and {cross['train_late_test_early']:.2f}",
+                f"trained on one, tested on the other, {cross['days_apart']:.0f} days apart, "
+                "no recalibration",
+            )
+        )
+    clip = m.get("input_range")
+    if clip is not None:
+        out.append(
+            (
+                "Samples of a real channel outside the ±1 mV ADC range",
+                f"{clip['wideband_clipped']:.1%} wideband; {clip['narrowband_clipped']:.2%} "
+                "through the 300 Hz to 1 kHz amplifier",
+                f"Nason in-vivo broadband, RMS {clip['broadband_rms_uv']:.0f} µV; the "
+                "wideband chain would need more range, hence more bits",
+            )
+        )
+    out.append(
+        (
+            f"Bridge check at {check['low_current_ua']:g} µA",
+            f"crossings r = {check['crossings_r_actual']:.2f} measured, "
+            f"{check['crossings_r_predicted']:.2f} predicted; SBP "
+            f"{check['sbp_r_actual']:.3f} and {check['sbp_r_predicted']:.3f}",
+            "on MEArec, where the cheaper chain can be simulated directly; crossings against "
+            "true spike counts, SBP against the reference chain's",
+        )
+    )
+    lines = ["| Quantity | Value | How it is defined |", "|---|---|---|"]
+    lines += [f"| {name} | {value} | {note} |" for name, value, note in out]
+    return "\n".join(lines)
+
+
 TABLES = {
     "U0_RESULTS": ("u0_metrics.json", u0_table),
     "U1_RESULTS": ("u1_metrics.json", u1_table),
     "U2_RESULTS": ("u2_metrics.json", u2_table),
+    "U3_RESULTS": ("u3_metrics.json", u3_table),
 }
 
 
