@@ -4,7 +4,7 @@
 decodes well while the implant is stimulating and its electrodes are aging?**
 
 A brain implant has microvolt signals, a few milliwatts of power and a radio
-that can send well under 1 % of what its electrodes record. Every stage of the
+that can send well under 1% of what its electrodes record. Every stage of the
 chain (electrode, amplifier, ADC, feature extraction, decoder) trades power
 against decoding accuracy. NeuroChain models the whole chain, measures that
 trade on public recordings, and implements the winning feature path in RTL.
