@@ -199,22 +199,44 @@ Carried forward from U3:
       outside this project.
 - [ ] **The bridge was checked at one current (0.5 µA) on simulated data.** It is
       slightly pessimistic for crossings and slightly optimistic for SBP.
-- [ ] **U4 must repeat the SBP-versus-crossings comparison with the Kalman
-      filter and GRU**, at least at the conventional chain and the winner.
+- [x] **U4 must repeat the SBP-versus-crossings comparison with the Kalman
+      filter and GRU** (done in U4: the choice survives every decoder), at least at the conventional chain and the winner.
 - [ ] **U6: a fixed decoder does not transfer across NoMAD's sessions**
       (R² -0.01 and -0.07). No front-end choice fixes that.
 - [ ] **The wideband chain's ADC range is too small for real LFP**, which the
       sweep did not charge it for. A fair crossings chain needs either more bits
       or a higher analog corner.
 
-## U4: decoders and evaluation
+## U4: decoders and evaluation — DONE
 
 Done-criterion: R² per configuration with confidence intervals.
 
-- [ ] Kalman filter decoder
-- [ ] Small GRU decoder (PyTorch, MPS)
-- [ ] Session-held-out splits
-- [ ] `docs/U4_design.md`, key-number script, three prediction checks
+- [x] Kalman filter decoder (steady-state gain, displacement in the state,
+      delay chosen by cross-validation; `decode/kalman.py`)
+- [x] Small GRU decoder (64 units; trains on the CPU, which was faster than MPS
+      at this size; `decode/gru.py`)
+- [x] Wiener filter added as the tuned linear baseline (`decode/ridge.py`)
+- [x] Held-out splits: contiguous blocks of trials within a session, and a whole
+      held-out NoMAD session; 95 % intervals from resampling trials, paired
+      intervals on differences (`decode/evaluate.py`)
+- [x] `make u4` writes three figures, `results/u4_metrics.json` and the README
+      table; `docs/U4_design.md` with four prediction checks; `make u4-key`
+
+Key number: on Nason the 0.48 µW chain keeps 93 to 101 % of the conventional
+chain's R² under every decoder; with the GRU it scores 0.720 [0.695, 0.744]
+against 0.713 [0.689, 0.737].
+
+Carried forward from U4:
+
+- [ ] **Offline decoding only, not closed-loop.** Offline R² ranks decoders
+      imperfectly; the GRU's 0.28 lead over linear decoders on Nason may shrink
+      online.
+- [ ] **The GRU result depends on its size.** With 8 hidden units instead of 64,
+      U3's choice loses 0.098 against the conventional chain (prediction
+      check 2). "Survives every decoder" holds for the decoders as configured.
+- [ ] **U6: cross-session decoding.** Fitted on one NoMAD session and tested on
+      the other, the best decoder (Wiener) scores R² 0.24; the GRU and Kalman
+      filter transfer worse. U6 tests why, together with a stabiliser.
 
 ## U5: stimulation artifacts (B)
 

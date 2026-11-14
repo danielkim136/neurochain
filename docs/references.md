@@ -108,6 +108,29 @@ first uses them. DOIs were resolved on 2026-11-13.
 - **Karpowicz, B. M. et al. (2025)** (listed below). The NoMAD data the Pareto
   is also evaluated on.
 
+## U4: decoders and evaluation
+
+- **Wu, W., Gao, Y., Bienenstock, E., Donoghue, J. P. and Black, M. J. (2006).**
+  Bayesian population decoding of motor cortical activity using a Kalman filter.
+  *Neural Computation* 18(1), 80-118.
+  <https://doi.org/10.1162/089976606774841585>. The Kalman filter decoder's
+  generative model.
+- **Malik, W. Q., Truccolo, W., Brown, E. N. and Hochberg, L. R. (2011).**
+  Efficient decoding with steady-state Kalman filter in neural interface
+  systems. *IEEE Transactions on Neural Systems and Rehabilitation Engineering*
+  19(1), 25-34. <https://doi.org/10.1109/TNSRE.2010.2092443>. Why the gain is
+  computed once instead of every step.
+- **Carmena, J. M. et al. (2003).** Learning to control a brain-machine
+  interface for reaching and grasping by primates. *PLoS Biology* 1(2), e42.
+  <https://doi.org/10.1371/journal.pbio.0000042>. Wiener filter decoding of
+  movement from many channels.
+- **Cho, K. et al. (2014).** Learning phrase representations using RNN
+  encoder-decoder for statistical machine translation.
+  <https://arxiv.org/abs/1406.1078>. The gated recurrent unit.
+- **Kingma, D. P. and Ba, J. (2015).** Adam: a method for stochastic
+  optimization. <https://arxiv.org/abs/1412.6980>. The optimiser that trains
+  the GRU.
+
 ## Later units (listed in the plan, not yet relied on)
 
 - **Karpowicz, B. M. et al. (2025).** Stabilizing brain-computer interfaces

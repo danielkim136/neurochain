@@ -24,9 +24,9 @@ The project has three parts:
 | U0 | Repo, data loaders, band-split, spectra and spike amplitudes | **Done** |
 | U1 | Electrode and front-end model (ngspice), noise budget, NEF | **Done** |
 | U2 | ADC sweeps; threshold, NEO and spiking-band-power features; fixed point | **Done** |
-| U3 | Power model and co-design: accuracy vs µW Pareto | Next |
-| U4 | Kalman and GRU decoders, session-held-out evaluation | Planned |
-| U5 | Stimulation artifacts and fixed-point cancellation | Planned |
+| U3 | Power model and co-design: accuracy vs µW Pareto | **Done** |
+| U4 | Kalman and GRU decoders, session-held-out evaluation | **Done** |
+| U5 | Stimulation artifacts and fixed-point cancellation | Next |
 | U6 | Electrode aging stress test | Planned |
 | U7 | RTL (SystemVerilog), bit-exact tests, ECP5 synthesis | Planned |
 | U8 | ADS1299 board, saline phantom, stimulator: design for later build | Planned |
@@ -242,6 +242,14 @@ and little LFP, the 50 µV target cut-off is a choice that moves F1, and the NEO
 detector was not retuned for each ADC setting. More in
 [docs/U2_design.md](docs/U2_design.md#limitations).
 
+### U3: what a chain costs, and the cheapest one that still decodes
+
+A per-stage power model (amplifier, ADC, logic, radio) prices 151 chain
+configurations, and a bridge measured on MEArec carries each chain's effect onto
+the recorded Nason and NoMAD features. Each configuration is then decoded with
+the U2 ridge readout and 5-fold cross-validation over contiguous blocks of
+trials.
+
 <!-- BEGIN U3_RESULTS -->
 | Quantity | Value | How it is defined |
 |---|---|---|
@@ -259,6 +267,60 @@ detector was not retuned for each ADC setting. More in
 | Samples of a real channel outside the ±1 mV ADC range | 6.4% wideband; 0.00% through the 300 Hz to 1 kHz amplifier | Nason in-vivo broadband, RMS 972 µV; the wideband chain would need more range, hence more bits |
 | Bridge check at 0.5 µA | crossings r = 0.28 measured, 0.25 predicted; SBP 0.968 and 0.979 | on MEArec, where the cheaper chain can be simulated directly; crossings against true spike counts, SBP against the reference chain's |
 <!-- END U3_RESULTS -->
+
+This table is generated from [results/u3_metrics.json](results/u3_metrics.json)
+by `make readme`.
+
+Four findings:
+
+1. **0.48 µW per channel.** A narrowband amplifier at 250 nA, an 8-bit ADC at
+   2 kS/s and spiking-band power decode finger velocity within 5 % of a 19.6 µW
+   conventional chain, 40.6 times less power.
+2. **The saving comes from the feature, not from trimming.** The cheapest
+   crossings-only match on the same data is 9.19 µW. Lower current and fewer
+   bits buy a factor of 2.1; switching to SBP buys another 19. NoMAD has no
+   recorded SBP, so there the saving stops at about 5×.
+3. **The amplifier is 93 % of the winner's power.** The ADC, logic and radio
+   are already nearly free, so the next gain has to come from a lower NEF.
+4. **A fixed decoder does not survive nine months.** Trained on one NoMAD
+   session and tested on the other, 274 days apart, the readout scores R² -0.01
+   and -0.07. No front-end choice fixes that; it is U6's problem.
+
+The constants can be changed with `make u3-key ARGS="..."`; see the
+[prediction checks](docs/U3_design.md#6-prediction-checks).
+
+![Held-out R² against power per channel for every chain configuration](figures/u3_pareto.png)
+
+*Accuracy against µW per channel on Nason (finger velocity) and both NoMAD
+sessions (cursor velocity), with the cheapest chain within 5 % of the
+conventional one marked.*
+
+![Where the power goes in a few named configurations](figures/u3_power_breakdown.png)
+
+*Share of each configuration's power spent in the amplifier, ADC, logic and
+radio, from streaming every sample to the 0.48 µW winner.*
+
+![How features degrade with amplifier current, and what that does to decoding](figures/u3_bridge.png)
+
+*Left: share of the reference chain's real spikes still detected as the
+amplifier current falls, on MEArec. Right: held-out R² on Nason against current
+for each feature at 8 bits. SBP holds its accuracy to a tenth of the current
+crossings need.*
+
+**Limits of these numbers.** The bridge is a model, checked on MEArec at one
+current and not on real data. NEF is held at 4.0 from 25 nA to 20 µA, so 250 nA
+is an extrapolation. The 40× rests on one 8.9-minute Nason session, and the
+wideband chain was not charged for the ADC range real LFP needs, which is
+generous to crossings. More in
+[docs/U3_design.md](docs/U3_design.md#limitations).
+
+### U4: does the choice survive better decoders?
+
+Four causal decoders (U3's ridge readout, a tuned Wiener filter, a steady-state
+Kalman filter and a 64-unit GRU) are scored on the conventional chain, U3's
+choice and the cheapest chains. Folds are contiguous blocks of trials, R² is
+pooled over all held-out bins, and 95 % intervals come from resampling trials,
+with paired intervals on every difference.
 
 <!-- BEGIN U4_RESULTS -->
 | Quantity | Value | How it is defined |
@@ -294,6 +356,52 @@ detector was not retuned for each ADC setting. More in
 | Evaluation | 5 folds, 1000 bootstrap resamples, seed 0 | folds are contiguous blocks of trials; intervals are 95 %, from resampling trials (NoMAD: recording segments) |
 <!-- END U4_RESULTS -->
 
+This table is generated from [results/u4_metrics.json](results/u4_metrics.json)
+by `make readme`.
+
+Four findings:
+
+1. **U3's choice survives every decoder.** On Nason the 0.48 µW chain keeps 93
+   to 101 % of the conventional chain's R², and with the three tuned decoders
+   the paired difference includes zero. The better the decoder, the less the
+   cheap chain loses.
+2. **On finger movements, the decoder matters more than the front end.** The
+   GRU scores 0.72 on the 0.48 µW chain where the best linear decoder scores
+   0.47. Even the 0.12 µW chain under the GRU (0.643) beats the 19.63 µW chain
+   under any linear decoder (0.478 at best).
+3. **The Kalman filter is a bet on its model.** It is the best decoder on NoMAD
+   session 1 (0.623), whose cursor velocity is smooth, and the worst on Nason
+   (0.363), whose finger velocity is bursts between holds.
+4. **Moved to another session, every decoder mostly fails.** Fitted on one NoMAD
+   session and tested on the other, the best (the Wiener filter, 0.239 and
+   0.245) keeps under half of its within-session R²; the GRU and Kalman filter
+   transfer worse. This goes to U6.
+
+The decoders are nearly free in power: the GRU, the most expensive, adds 1.3 %
+to the 0.48 µW chain. The exact commands are in the
+[prediction checks](docs/U4_design.md#5-prediction-checks).
+
+![Held-out R² with 95 % intervals for every decoder and chain](figures/u4_decoders.png)
+
+*R² for each decoder on the conventional chain, U3's choice and cheaper chains,
+on Nason and both NoMAD sessions; intervals from resampling trials.*
+
+![True velocity against each decoder's held-out prediction](figures/u4_traces.png)
+
+*A stretch of held-out finger velocity: the linear decoders wobble in the holds
+and undershoot the bursts; the GRU sits at zero and then follows.*
+
+![R² within a session against the same decoder moved to the other NoMAD session](figures/u4_cross_session.png)
+
+*Each decoder fitted on one NoMAD session and tested on the other, 274 days
+apart, with no recalibration, beside its within-session score.*
+
+**Limits of these numbers.** These are offline reconstructions, not closed-loop
+control. The GRU result depends on its size: with 8 hidden units instead of 64,
+U3's choice loses 0.098. Each configuration uses one draw of the bridge, and
+NoMAD session 2 has only 16 segments, so only its paired differences are tight.
+More in [docs/U4_design.md](docs/U4_design.md#limitations).
+
 ## Reproduce
 
 Requires [uv](https://docs.astral.sh/uv/) and `make`. Python 3.12 is installed
@@ -305,7 +413,9 @@ make u0        # download data (65 MB), write the U0 figures, metrics and table
 make u1        # U1 figures, metrics, table and netlists (needs ngspice and the Nason data)
 make mearec    # generate the MEArec ground-truth recording (about a minute)
 make u2        # U2 figures, metrics and table (needs `make mearec` and the Nason data)
-make test      # 270+ tests; the ones needing data or ngspice skip if absent
+make u3        # U3 power sweep, figures, metrics and table (about four minutes)
+make u4        # U4 decoders, figures, metrics and table (about three minutes)
+make test      # 309 tests; the ones needing data or ngspice skip if absent
 ```
 
 U1 needs [ngspice](https://ngspice.sourceforge.io/) (`brew install ngspice`) and
@@ -336,8 +446,11 @@ src/neurochain/
   adc.py                sampling and quantisation
   features/             causal spike detectors, spiking-band power, scoring
   fixedpoint.py         integer-only versions of the feature paths
-  decode/               decoders (so far a ridge readout with blocked cross-validation)
-  analysis/             per-unit analyses and their figures
+  power.py              per-stage power model: amplifier, ADC, logic, radio
+  bridge.py             carries a chain's effect onto recorded features
+  decode/               ridge and Wiener (ridge.py), kalman.py, gru.py, evaluate.py
+  analysis/             per-unit analyses and their figures (u3.py: co-design sweep;
+                        u4.py: decoder comparison)
   viz.py                shared figure style
 scripts/                one script per figure or key number
 tests/                  pytest; no test needs downloaded data unless marked `data`
@@ -355,6 +468,8 @@ checks: change one parameter, predict the result, then run it.
 - [U0: repo, data and band-split](docs/U0_design.md)
 - [U1: electrode and front-end model](docs/U1_design.md)
 - [U2: ADC and features](docs/U2_design.md)
+- [U3: power model and co-design](docs/U3_design.md)
+- [U4: decoders and evaluation](docs/U4_design.md)
 - [References](docs/references.md)
 
 ## Safety

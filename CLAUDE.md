@@ -114,6 +114,8 @@ make u2        # U2 figures, metrics, README table (needs `make mearec` + Nason 
 make u2-key    # U2 key numbers; ARGS="--bits 6" changes one setting
 make u3        # U3 sweep, figures, metrics, README table (about four minutes)
 make u3-key    # U3 key numbers; ARGS="--nef 2" changes a power-model constant
+make u4        # U4 decoders, figures, metrics, README table (about three minutes)
+make u4-key    # U4 key numbers; ARGS="--gru-hidden 8" changes one decoder setting
 make test      # pytest
 make lint      # ruff + mypy
 ```
@@ -192,6 +194,25 @@ Run Python through uv: `uv run python ...`, `uv run pytest`.
   2 kS/s: 0.48 µW per channel. This is what U7 implements.
 - **Held-out** means contiguous blocks of trials within a session. NoMAD's two
   sessions do not support cross-session evaluation with a fixed decoder.
+
+## Decoding conventions (set in U4)
+
+- **Four causal decoders** in `neurochain.decode`, sharing one fit/predict
+  interface: U3's ridge readout and the Wiener filter (`ridge.py`), a
+  steady-state Kalman filter (`kalman.py`), a 64-unit GRU (`gru.py`).
+  Evaluation lives in `evaluate.py`.
+- **Held-out** means five contiguous blocks of trials, each predicted by a
+  decoder fitted on the other four; feature scaling uses the training blocks
+  only. Cross-session (one NoMAD session to the other) is reported separately.
+- **R² is pooled** over all held-out bins, averaged over the behaviour's
+  dimensions, not a mean of per-fold R².
+- **Intervals come from resampling trials** (1000 resamples, 95 %), not bins:
+  neighbouring bins are correlated. NoMAD resamples recording segments.
+- **Comparisons use paired differences**: both sides scored on the same
+  resampled trials, difference taken inside each resample.
+- **The Wiener filter, not U3's ridge readout, is the linear baseline**: U3's
+  readout has a fixed history and penalty and is under-tuned on NoMAD.
+- **The GRU trains on the CPU.** At this size MPS was slower.
 
 ## Toolchain status
 
