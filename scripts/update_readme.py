@@ -472,12 +472,186 @@ def u4_table(m: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def u5_table(m: dict[str, Any]) -> str:
+    """Build the U5 results table from ``results/u5_metrics.json``."""
+    key, sig, rec, prop = m["key"], m["signal"], m["recovery"]["chains"], m["propagation"]
+    index = sig["amplitudes_mv"].index(key["example_mv"])
+    at = f"{key['example_mv']:g} mV artifact"
+    chains = {"sbp": "0.48 µW chain", "crossings": "conventional chain"}
+    treatments = {"none": "no treatment", "blank": "blanking", "template": "template canceller"}
+    out: list[tuple[str, str, str]] = []
+    for s in prop["scenarios"]:
+        out.append(
+            (
+                f"Artifact, stimulating electrode {s['name']}"
+                if s["distance_mm"]
+                else "Artifact on the stimulating array",
+                f"{s['median_mv']:.1f} mV median ({s['min_mv']:.1f} to {s['max_mv']:.1f})",
+                f"{prop['current_ua']:.0f} µA monopolar pulse, {prop['charge_per_phase_nc']:.0f} "
+                f"nC per phase, tissue {prop['sigma_s_per_m']:g} S/m (assumed); "
+                f"{s['share_above_adc']:.0%} of channels past the ADC's "
+                f"±{prop['adc_range_mv']:.0f} mV, {s['share_above_amplifier']:.0%} past the "
+                f"amplifier's ±{prop['amplifier_range_mv']:.0f} mV",
+            )
+        )
+    for name, chain in rec.items():
+        spice = chain["spice_ms"][index]
+        electrode = chain["spice_electrode_ms"][index]
+        checked = (
+            "ngspice not run"
+            if spice is None
+            else f"ngspice {spice:.2f} ms, {electrode:.2f} ms with the electrode in series"
+        )
+        out.append(
+            (
+                f"Recovery time, {chains[name]}",
+                f"{chain['model_ms'][index]:.2f} ms ({checked})",
+                f"{at}; from the end of the pulse until the output stays within "
+                f"±{m['recovery']['threshold_uv']:.0f} µV at the input; high-pass corner "
+                f"{chain['f_low_hz']:.0f} Hz",
+            )
+        )
+    gaps = [c["largest_model_spice_gap_us"] for c in rec.values()]
+    if None not in gaps:
+        out.append(
+            (
+                "Python model against ngspice",
+                f"recovery times within {max(gaps):.0f} µs",
+                f"both chains, {len(sig['amplitudes_mv'])} amplitudes from "
+                f"{sig['amplitudes_mv'][0]:g} to {sig['amplitudes_mv'][-1]:g} mV, ideal source",
+            )
+        )
+    for treatment, label in treatments.items():
+        sbp = sig["sbp"][treatment]
+        out.append(
+            (
+                f"SBP while stimulating, {label}",
+                f"shift {sbp['bias'][index]:+.2f} noise floors, {sbp['valid'][index]:.0%} of "
+                "samples kept",
+                f"{at}, {sig['realised_rate_hz']:.0f} pulses per second, MEArec, "
+                f"{sig['n_channels']} channels; shift is the mean change of a stimulated 50 ms "
+                "bin",
+            )
+        )
+    real = m["in_vivo"]
+    if real:
+        parts = ", ".join(
+            f"{treatments[t]} {v['bias']:+.2f}" for t, v in real["treatments"].items()
+        )
+        out.append(
+            (
+                "Same on a real recording",
+                parts,
+                f"SBP shift in noise floors, Nason in-vivo channel, {at}, "
+                f"{real['stimulated_bins']} stimulated bins",
+            )
+        )
+    decode = m["decoding"]
+    if decode:
+        scenario, decoder = key["scenario"], key["decoder"]
+        names = {"gru": "GRU", "wiener": "Wiener filter"}
+        rows = {
+            (r["chain"], r["scenario"], r["treatment"], r["decoder"], r["fitted"]): r
+            for r in decode["rows"]
+        }
+        others = [d for d in decode["no_stimulation_r2"]["sbp"] if d != decoder]
+        others = [d for d in others if not d.endswith("_all_bins")]
+        elsewhere = list(dict.fromkeys(r["scenario"] for r in decode["rows"]))[1:]
+
+        def change(row: dict[str, Any]) -> str:
+            return f"{row['loss']:+.3f} [{row['loss_low']:+.3f}, {row['loss_high']:+.3f}]"
+
+        for name, label in chains.items():
+            reference = decode["no_stimulation_r2"][name]
+            out.append(
+                (
+                    f"Decoding, {label}, no stimulation",
+                    ", ".join(
+                        f"R² {reference[d]:.3f} ({names.get(d, d)})" for d in (decoder, *others)
+                    ),
+                    "Nason, finger velocity; the stimulated bins of the held-out folds, before "
+                    "any artifact is added",
+                )
+            )
+            for treatment, treatment_label in treatments.items():
+                plain = rows[name, scenario, treatment, decoder, "without stimulation"]
+                refit = rows[name, scenario, treatment, decoder, "with stimulation"]
+                out.append(
+                    (
+                        f"Decoding, {label}, {treatment_label}",
+                        f"R² {plain['r2']:.3f}, change {change(plain)}; refitted R² "
+                        f"{refit['r2']:.3f}, change {change(refit)}",
+                        f"{names.get(decoder, decoder)}, stimulating electrode on the {scenario}; "
+                        "decoder fitted without stimulation, then refitted with it on; change "
+                        "is paired, against no stimulation",
+                    )
+                )
+            for other in others:
+                parts = []
+                for treatment in ("blank", "template"):
+                    plain = rows[name, scenario, treatment, other, "without stimulation"]
+                    refit = rows[name, scenario, treatment, other, "with stimulation"]
+                    parts.append(
+                        f"{treatments[treatment]} {plain['loss']:+.3f}, refitted "
+                        f"{refit['loss']:+.3f}"
+                    )
+                out.append(
+                    (
+                        f"Decoding, {label}, {names.get(other, other)}",
+                        "; ".join(parts),
+                        f"change in R², {scenario}",
+                    )
+                )
+            parts = []
+            for place in elsewhere:
+                blank = rows[name, place, "blank", decoder, "without stimulation"]
+                template = rows[name, place, "template", decoder, "without stimulation"]
+                parts.append(
+                    f"{place}: blanking {blank['loss']:+.3f}, template canceller "
+                    f"{template['loss']:+.3f}"
+                )
+            if parts:
+                out.append(
+                    (
+                        f"Decoding, {label}, other geometries",
+                        "; ".join(parts),
+                        f"change in R², {names.get(decoder, decoder)} fitted without stimulation",
+                    )
+                )
+    cost = m["cost"]["chains"]
+    for name, label in chains.items():
+        c = cost[name]
+        out.append(
+            (
+                f"Canceller cost, {label}",
+                f"{c['canceller_uw']:.3f} µW per channel ({c['share_of_chain']:.1%} of the "
+                f"chain), {c['template_bits_per_channel']} bits of memory",
+                f"{m['cost']['adds_per_sample']} additions per sample and no multiplier, each "
+                "charged as a 1 pJ multiply; an upper bound until U7",
+            )
+        )
+    fixed = m["fixed_point"]
+    out.append(
+        (
+            "Integer canceller against floating point",
+            f"largest difference {fixed['canceller_max_difference_lsb']:.2f} LSB; SBP "
+            f"correlation {fixed['sbp_correlation']:.4f}",
+            f"one MEArec channel, {fixed['seconds']:.0f} s, {fixed['template_bits']}-bit "
+            "template; the integer version is the reference for U7",
+        )
+    )
+    lines = ["| Quantity | Value | How it is defined |", "|---|---|---|"]
+    lines += [f"| {name} | {value} | {note} |" for name, value, note in out]
+    return "\n".join(lines)
+
+
 TABLES = {
     "U0_RESULTS": ("u0_metrics.json", u0_table),
     "U1_RESULTS": ("u1_metrics.json", u1_table),
     "U2_RESULTS": ("u2_metrics.json", u2_table),
     "U3_RESULTS": ("u3_metrics.json", u3_table),
     "U4_RESULTS": ("u4_metrics.json", u4_table),
+    "U5_RESULTS": ("u5_metrics.json", u5_table),
 }
 
 

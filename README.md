@@ -402,6 +402,53 @@ U3's choice loses 0.098. Each configuration uses one draw of the bridge, and
 NoMAD session 2 has only 16 segments, so only its paired differences are tight.
 More in [docs/U4_design.md](docs/U4_design.md#limitations).
 
+### U5: can the chain keep recording while the implant stimulates?
+
+A 60 µA stimulation pulse puts millivolts on every electrode of its own array,
+against spikes of tens of microvolts. U5 models how the artifact gets there,
+simulates the front end saturating and recovering (ngspice and a Python model
+that agree), removes the artifact with a multiplier-free adaptive template
+canceller, and measures what is left in the features and in the decoder's
+output. Reasoning and prediction checks: [docs/U5_design.md](docs/U5_design.md).
+
+<!-- BEGIN U5_RESULTS -->
+| Quantity | Value | How it is defined |
+|---|---|---|
+| Artifact on the stimulating array | 9.9 mV median (6.2 to 39.8) | 60 µA monopolar pulse, 12 nC per phase, tissue 0.3 S/m (assumed); 100% of channels past the ADC's ±1 mV, 72% past the amplifier's ±8 mV |
+| Artifact, stimulating electrode 5 mm away | 3.1 mV median (2.3 to 5.0) | 60 µA monopolar pulse, 12 nC per phase, tissue 0.3 S/m (assumed); 100% of channels past the ADC's ±1 mV, 0% past the amplifier's ±8 mV |
+| Artifact, stimulating electrode 20 mm away | 0.8 mV median (0.7 to 0.9) | 60 µA monopolar pulse, 12 nC per phase, tissue 0.3 S/m (assumed); 0% of channels past the ADC's ±1 mV, 0% past the amplifier's ±8 mV |
+| Recovery time, 0.48 µW chain | 2.95 ms (ngspice 2.94 ms, 2.87 ms with the electrode in series) | 30 mV artifact; from the end of the pulse until the output stays within ±13 µV at the input; high-pass corner 300 Hz |
+| Recovery time, conventional chain | 1.01 ms (ngspice 1.01 ms, 1.23 ms with the electrode in series) | 30 mV artifact; from the end of the pulse until the output stays within ±13 µV at the input; high-pass corner 1 Hz |
+| Python model against ngspice | recovery times within 4 µs | both chains, 7 amplitudes from 0.1 to 100 mV, ideal source |
+| SBP while stimulating, no treatment | shift +16.57 noise floors, 100% of samples kept | 30 mV artifact, 100 pulses per second, MEArec, 32 channels; shift is the mean change of a stimulated 50 ms bin |
+| SBP while stimulating, blanking | shift -0.04 noise floors, 60% of samples kept | 30 mV artifact, 100 pulses per second, MEArec, 32 channels; shift is the mean change of a stimulated 50 ms bin |
+| SBP while stimulating, template canceller | shift -0.04 noise floors, 86% of samples kept | 30 mV artifact, 100 pulses per second, MEArec, 32 channels; shift is the mean change of a stimulated 50 ms bin |
+| Same on a real recording | no treatment +14.83, blanking -0.03, template canceller +0.00 | SBP shift in noise floors, Nason in-vivo channel, 30 mV artifact, 91 stimulated bins |
+| Decoding, 0.48 µW chain, no stimulation | R² 0.718 (GRU), R² 0.450 (Wiener filter) | Nason, finger velocity; the stimulated bins of the held-out folds, before any artifact is added |
+| Decoding, 0.48 µW chain, no treatment | R² -0.252, change -0.970 [-1.075, -0.882]; refitted R² 0.005, change -0.713 [-0.747, -0.680] | GRU, stimulating electrode on the same array; decoder fitted without stimulation, then refitted with it on; change is paired, against no stimulation |
+| Decoding, 0.48 µW chain, blanking | R² 0.579, change -0.139 [-0.168, -0.111]; refitted R² 0.679, change -0.039 [-0.064, -0.014] | GRU, stimulating electrode on the same array; decoder fitted without stimulation, then refitted with it on; change is paired, against no stimulation |
+| Decoding, 0.48 µW chain, template canceller | R² 0.627, change -0.091 [-0.115, -0.067]; refitted R² 0.707, change -0.011 [-0.032, +0.009] | GRU, stimulating electrode on the same array; decoder fitted without stimulation, then refitted with it on; change is paired, against no stimulation |
+| Decoding, 0.48 µW chain, Wiener filter | blanking -0.146, refitted -0.080; template canceller -0.082, refitted -0.072 | change in R², same array |
+| Decoding, 0.48 µW chain, other geometries | 5 mm away: blanking -0.147, template canceller -0.023; 20 mm away: blanking -0.116, template canceller -0.042 | change in R², GRU fitted without stimulation |
+| Decoding, conventional chain, no stimulation | R² 0.724 (GRU), R² 0.476 (Wiener filter) | Nason, finger velocity; the stimulated bins of the held-out folds, before any artifact is added |
+| Decoding, conventional chain, no treatment | R² -0.260, change -0.984 [-1.062, -0.911]; refitted R² 0.423, change -0.302 [-0.369, -0.245] | GRU, stimulating electrode on the same array; decoder fitted without stimulation, then refitted with it on; change is paired, against no stimulation |
+| Decoding, conventional chain, blanking | R² 0.614, change -0.110 [-0.146, -0.079]; refitted R² 0.699, change -0.025 [-0.044, -0.006] | GRU, stimulating electrode on the same array; decoder fitted without stimulation, then refitted with it on; change is paired, against no stimulation |
+| Decoding, conventional chain, template canceller | R² 0.351, change -0.374 [-0.434, -0.313]; refitted R² 0.692, change -0.033 [-0.054, -0.010] | GRU, stimulating electrode on the same array; decoder fitted without stimulation, then refitted with it on; change is paired, against no stimulation |
+| Decoding, conventional chain, Wiener filter | blanking -0.023, refitted +0.002; template canceller -0.035, refitted -0.026 | change in R², same array |
+| Decoding, conventional chain, other geometries | 5 mm away: blanking -0.160, template canceller -0.329; 20 mm away: blanking -0.216, template canceller -0.136 | change in R², GRU fitted without stimulation |
+| Canceller cost, 0.48 µW chain | 0.004 µW per channel (0.8% of the chain), 224 bits of memory | 2 additions per sample and no multiplier, each charged as a 1 pJ multiply; an upper bound until U7 |
+| Canceller cost, conventional chain | 0.060 µW per channel (0.3% of the chain), 4800 bits of memory | 2 additions per sample and no multiplier, each charged as a 1 pJ multiply; an upper bound until U7 |
+| Integer canceller against floating point | largest difference 0.29 LSB; SBP correlation 0.9984 | one MEArec channel, 20 s, 14-bit template; the integer version is the reference for U7 |
+<!-- END U5_RESULTS -->
+
+![Artifact amplitude against distance and across the stimulating array](figures/u5_artifact.png)
+
+![Each chain's response to one pulse in the model and in ngspice, and recovery time against amplitude](figures/u5_recovery.png)
+
+![A real recording with an injected artifact before and after each treatment, and what each leaves in SBP](figures/u5_cancellation.png)
+
+![Decoding R² on stimulated bins for each chain, treatment and stimulation geometry](figures/u5_decoding.png)
+
 ## Reproduce
 
 Requires [uv](https://docs.astral.sh/uv/) and `make`. Python 3.12 is installed
