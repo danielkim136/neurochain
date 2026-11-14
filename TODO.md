@@ -118,7 +118,7 @@ Carried forward from U1:
 - [ ] **No 1/f noise in the amplifier model.** Small in the spike band (about
       4 % of noise power for a 100 Hz corner, hand estimate), large below
       300 Hz. Add it before any LFP-band result.
-- [ ] **Rails are a hard clip.** U5 needs saturation recovery.
+- [x] **Rails are a hard clip.** U5 needs saturation recovery.
 - [ ] **Harrison's supply voltage is unverified.** The 5 V that gives 16 µA and
       NEF 4.0 is from memory; the full text was not reachable. Check the paper.
 
@@ -238,14 +238,36 @@ Carried forward from U4:
       the other, the best decoder (Wiener) scores R² 0.24; the GRU and Kalman
       filter transfer worse. U6 tests why, together with a stabiliser.
 
-## U5: stimulation artifacts (B)
+## U5: stimulation artifacts (B) — DONE
 
 Done-criterion: decoding loss with and without cancellation, plus recovery time.
 
-- [ ] Artifact model: dipole propagation, front-end saturation and recovery in SPICE
-- [ ] Injection into real recordings
-- [ ] Fixed-point adaptive cancellation
-- [ ] `docs/U5_design.md`, key-number script, three prediction checks
+- [x] Artifact model: point-source propagation in resistive tissue (`stim/propagation.py`), charge-balanced pulses (`stim/pulse.py`), front-end saturation and recovery in ngspice and a matching Python model (`frontend/saturation.py`)
+- [x] Injection into real recordings: the Nason in-vivo channel, MEArec and the Nason SBP decoding data, three stimulation geometries
+- [x] Fixed-point adaptive cancellation: multiplier-free template canceller and blanking baseline (`stim/cancel.py`), integer version within 0.29 LSB of floating point
+- [x] `docs/U5_design.md` with prediction checks, `make u5-key`, `make u5` writes four figures, `results/u5_metrics.json` and the README table
+
+Key number: with the stimulating electrode on the recording array, the 0.48 µW chain
+plus a 0.004 µW template canceller decodes at R² 0.707 (GRU refitted with stimulation
+on) against 0.718 without stimulation; recovery from a 30 mV artifact takes 2.95 ms
+(conventional chain 1.01 ms).
+
+Carried forward from U5:
+
+- [ ] **Decoders must be calibrated with stimulation on**; a GRU fitted without it loses 0.09
+      to 0.37. U6 should test whether its stabiliser also absorbs this shift.
+- [ ] **With a Wiener filter the 0.48 µW chain loses 0.072 R²** under same-array stimulation
+      even refitted; the conventional chain loses nothing.
+- [ ] **U7: the RTL reference for the canceller** is `neurochain.stim.cancel.cancel_template`
+      (shift 4, 6 fractional template bits, 2 fractional output bits that replace the
+      high-pass filter's guard bits, 16 taps at 2 kS/s). The stimulator must share the ADC
+      clock: ±100 µs of jitter breaks the canceller.
+- [ ] **The pulse shape is quoted from memory** of Flesher et al. (2016); the 1 % imbalance,
+      1 ms discharge and 0.3 S/m conductivity are assumptions. Verify before quoting.
+- [ ] **Not modelled:** lead-to-lead coupling inside the implant, a nonlinear pseudo-resistor,
+      stimulus-evoked spikes, amplitude-modulated stimulation (one template per level).
+- [ ] **The new ngspice transient tests have run only on macOS ngspice 47**; confirm CI
+      (ngspice 45, Linux).
 
 ## U6: aging stress test (C)
 

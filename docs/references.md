@@ -131,6 +131,47 @@ first uses them. DOIs were resolved on 2026-11-13.
   optimization. <https://arxiv.org/abs/1412.6980>. The optimiser that trains
   the GRU.
 
+## U5: stimulation artifacts
+
+- **Flesher, S. N. et al. (2016).** Intracortical microstimulation of human
+  somatosensory cortex. *Science Translational Medicine* 8(361), ra141.
+  <https://doi.org/10.1126/scitranslmed.aaf8083>. The reference pulse shape
+  (quoted from memory; verify before relying on it).
+- **Flesher, S. N. et al. (2021).** A brain-computer interface that evokes
+  tactile sensations improves robotic arm control. *Science* 372, 831-836.
+  <https://doi.org/10.1126/science.abd0380>. Why an implant has to record while
+  it stimulates.
+- **Logothetis, N. K., Kayser, C. and Oeltermann, A. (2007).** In vivo
+  measurement of cortical impedance spectrum in monkeys. *Neuron* 55, 809-823.
+  <https://doi.org/10.1016/j.neuron.2007.07.027>. Tissue is resistive, so the
+  artifact propagates without filtering.
+- **Merrill, D. R., Bikson, M. and Jefferys, J. G. R. (2005).** Electrical
+  stimulation of excitable tissue: design of efficacious and safe protocols.
+  *Journal of Neuroscience Methods* 141, 171-198.
+  <https://doi.org/10.1016/j.jneumeth.2004.10.020>. Charge-balanced stimulation.
+- **Weiss, J. M. et al. (2019).** Artifact-free recordings in human
+  bidirectional brain-computer interfaces. *Journal of Neural Engineering* 16,
+  016002. <https://doi.org/10.1088/1741-2552/aae748>. The blanking baseline.
+- **Widrow, B. et al. (1975).** Adaptive noise cancelling: principles and
+  applications. *Proceedings of the IEEE* 63, 1692-1716.
+  <https://doi.org/10.1109/PROC.1975.10036>. The LMS update behind the
+  template canceller.
+- **Mendrela, A. E. et al. (2016).** A bidirectional neural interface circuit
+  with active stimulation artifact cancellation and cross-channel common-mode
+  noise suppression. *IEEE Journal of Solid-State Circuits* 51, 955-965.
+  <https://doi.org/10.1109/JSSC.2015.2506651>. Alternative considered: analog
+  cancellation in the front end.
+- **O'Shea, D. J. and Shenoy, K. V. (2018).** ERAASR: an algorithm for removing
+  electrical stimulation artifacts from multielectrode array recordings.
+  *Journal of Neural Engineering* 15, 026020.
+  <https://doi.org/10.1088/1741-2552/aaa365>. Alternative considered:
+  cross-channel PCA removal.
+- **Zhou, A. et al. (2019).** A wireless and artefact-free 128-channel
+  neuromodulation device for closed-loop stimulation and recording in
+  non-human primates. *Nature Biomedical Engineering* 3, 15-26.
+  <https://doi.org/10.1038/s41551-018-0323-x>. Alternative considered: a front
+  end with enough range never to saturate.
+
 ## Later units (listed in the plan, not yet relied on)
 
 - **Karpowicz, B. M. et al. (2025).** Stabilizing brain-computer interfaces

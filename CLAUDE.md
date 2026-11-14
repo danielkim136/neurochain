@@ -116,6 +116,8 @@ make u3        # U3 sweep, figures, metrics, README table (about four minutes)
 make u3-key    # U3 key numbers; ARGS="--nef 2" changes a power-model constant
 make u4        # U4 decoders, figures, metrics, README table (about three minutes)
 make u4-key    # U4 key numbers; ARGS="--gru-hidden 8" changes one decoder setting
+make u5        # U5 figures, metrics, netlist, README table; about a minute; needs ngspice, `make mearec`, Nason data
+make u5-key    # U5 key numbers; ARGS="--adapt-shift 1" changes one setting; run one at a time, 16 GB RAM
 make test      # pytest
 make lint      # ruff + mypy
 ```
@@ -213,6 +215,22 @@ Run Python through uv: `uv run python ...`, `uv run pytest`.
 - **The Wiener filter, not U3's ridge readout, is the linear baseline**: U3's
   readout has a fixed history and penalty and is under-tuned on NoMAD.
 - **The GRU trains on the CPU.** At this size MPS was slower.
+
+## Stimulation conventions (set in U5)
+
+- **Artifact amplitude** means the peak potential of the first phase at the
+  electrode, in mV. Reference pulse: 60 µA, 200 µs cathodic, 100 µs gap, 400 µs
+  anodic at half current, 100 pulses per second, monopolar, distant reference.
+- **Recovery time** runs from the end of the second phase until the output stays
+  within ±13 µV referred to the input.
+- **The stimulator runs off the ADC clock**; pulses start on a sample edge.
+- **Large-signal front-end behaviour** comes from `neurochain.frontend.saturation`,
+  which a test keeps in agreement with ngspice; `spice/u5_saturation.cir` is
+  written by `make u5`.
+- **Treatments** are "none", "blank" and "template"; scores are R² on stimulated
+  bins, with paired differences against no stimulation, and say whether the
+  decoder was fitted with or without stimulation.
+- **Report canceller cost** in µW per channel (0.004 µW at 2 kS/s).
 
 ## Toolchain status
 

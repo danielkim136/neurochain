@@ -26,8 +26,8 @@ The project has three parts:
 | U2 | ADC sweeps; threshold, NEO and spiking-band-power features; fixed point | **Done** |
 | U3 | Power model and co-design: accuracy vs µW Pareto | **Done** |
 | U4 | Kalman and GRU decoders, session-held-out evaluation | **Done** |
-| U5 | Stimulation artifacts and fixed-point cancellation | Next |
-| U6 | Electrode aging stress test | Planned |
+| U5 | Stimulation artifacts and fixed-point cancellation: R² 0.707 refitted with stimulation against 0.718 without, 2.95 ms recovery | **Done** |
+| U6 | Electrode aging stress test | Next |
 | U7 | RTL (SystemVerilog), bit-exact tests, ECP5 synthesis | Planned |
 | U8 | ADS1299 board, saline phantom, stimulator: design for later build | Planned |
 
@@ -443,11 +443,19 @@ output. Reasoning and prediction checks: [docs/U5_design.md](docs/U5_design.md).
 
 ![Artifact amplitude against distance and across the stimulating array](figures/u5_artifact.png)
 
+*Peak artifact at each recording electrode against distance from a 60 µA pulse, and its spread across the stimulating array; tissue conductivity 0.3 S/m (assumed). On the same array every channel passes the ADC's ±1 mV range.*
+
 ![Each chain's response to one pulse in the model and in ngspice, and recovery time against amplitude](figures/u5_recovery.png)
+
+*One pulse through each chain in the Python model and in ngspice, which agree to within 4 µs, and recovery time against artifact amplitude. The 0.48 µW chain's 300 Hz high-pass corner makes it the slower to recover: 2.95 ms against 1.01 ms at 30 mV.*
 
 ![A real recording with an injected artifact before and after each treatment, and what each leaves in SBP](figures/u5_cancellation.png)
 
+*The Nason in-vivo channel with an injected 30 mV artifact, untreated, blanked and template-cancelled, and the SBP shift each leaves. Untreated, SBP rises by 14.8 noise floors; blanking and the canceller both bring it back to within 0.04, but blanking keeps 60 % of the samples where the canceller keeps 86 %.*
+
 ![Decoding R² on stimulated bins for each chain, treatment and stimulation geometry](figures/u5_decoding.png)
+
+*GRU and Wiener-filter R² on stimulated bins for each chain, treatment and stimulation geometry, fitted without stimulation and refitted with it on. With the canceller and a refitted GRU the 0.48 µW chain scores 0.707 against 0.718 without stimulation; a decoder never shown stimulation loses 0.09 to 0.37.*
 
 ## Reproduce
 
@@ -462,6 +470,8 @@ make mearec    # generate the MEArec ground-truth recording (about a minute)
 make u2        # U2 figures, metrics and table (needs `make mearec` and the Nason data)
 make u3        # U3 power sweep, figures, metrics and table (about four minutes)
 make u4        # U4 decoders, figures, metrics and table (about three minutes)
+make u5        # U5 figures, metrics, netlist and table (about a minute; needs ngspice, `make mearec` and the Nason data)
+make u5-key    # U5 key numbers; ARGS="--adapt-shift 1" changes one setting
 make test      # 309 tests; the ones needing data or ngspice skip if absent
 ```
 
@@ -489,15 +499,18 @@ src/neurochain/
   recording.py          the container every loader returns
   data/                 registry, verified downloader, loaders, synthetic generator
   dsp/                  band-split filters, spectra, spike detection
-  frontend/             electrode, amplifier, ngspice runner, emulator
+  frontend/             electrode, amplifier, ngspice runner, emulator,
+                        saturation.py (large-signal clipping and recovery)
   adc.py                sampling and quantisation
   features/             causal spike detectors, spiking-band power, scoring
   fixedpoint.py         integer-only versions of the feature paths
   power.py              per-stage power model: amplifier, ADC, logic, radio
   bridge.py             carries a chain's effect onto recorded features
+  stim/                 pulse.py (charge-balanced pulses), propagation.py (artifact
+                        in tissue), cancel.py (blanking and template canceller)
   decode/               ridge and Wiener (ridge.py), kalman.py, gru.py, evaluate.py
   analysis/             per-unit analyses and their figures (u3.py: co-design sweep;
-                        u4.py: decoder comparison)
+                        u4.py: decoder comparison; u5.py: stimulation)
   viz.py                shared figure style
 scripts/                one script per figure or key number
 tests/                  pytest; no test needs downloaded data unless marked `data`
@@ -517,6 +530,7 @@ checks: change one parameter, predict the result, then run it.
 - [U2: ADC and features](docs/U2_design.md)
 - [U3: power model and co-design](docs/U3_design.md)
 - [U4: decoders and evaluation](docs/U4_design.md)
+- [U5: stimulation artifacts](docs/U5_design.md)
 - [References](docs/references.md)
 
 ## Safety
