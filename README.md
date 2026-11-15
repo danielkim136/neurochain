@@ -457,6 +457,33 @@ output. Reasoning and prediction checks: [docs/U5_design.md](docs/U5_design.md).
 
 *GRU and Wiener-filter R² on stimulated bins for each chain, treatment and stimulation geometry, fitted without stimulation and refitted with it on. With the canceller and a refitted GRU the 0.48 µW chain scores 0.707 against 0.718 without stimulation; a decoder never shown stimulation loses 0.09 to 0.37.*
 
+### U6: does decoding survive an aging electrode?
+
+Reasoning and prediction checks: [docs/U6_design.md](docs/U6_design.md).
+
+<!-- BEGIN U6_RESULTS -->
+| Quantity | Value | How it is defined |
+|---|---|---|
+| Electrode after encapsulation | 218 to 540 kΩ at 1 kHz; front-end noise 3.4 to 7.9 µV | Randles electrode plus a series sheath solved for a 2.48-fold rise (Barrese 2013; assumption); noise over 300 Hz to 7.5 kHz referred to the tissue signal, conventional chain |
+| Spike amplitude at week 39 | median 0.87 of week 0 (0.55 to 0.98) | 2.4% lost per month on average (Chestek 2011; assumption), each channel at its own rate; 10th to 90th percentile of channels |
+| Crossings kept by the settled electrode | 79% at amplitude 1, 53% at amplitude 0.8, 22% at amplitude 0.5 | MEArec, 32 channels, 13 µV background, thresholds recalibrated; share of the week-0 chain's detections of real spikes |
+| Bridge check at amplitude 0.5 | SBP 0.114 simulated, 0.113 bridged; crossings 0.120 simulated, 0.116 bridged | correlation of the 50 ms feature with the true spike count, mean over MEArec channels: the aged feature simulated directly against the bridge's prediction from the week-0 feature |
+| R², 0.48 µW chain, Nason, Wiener | week 0: 0.472; week 39: 0.335 left alone, 0.365 with running z-score (+0.030 [+0.023, +0.038]), 0.358 refitted; week 104: 0.188 left alone, 0.230 with running z-score | 0.48 µW per channel; decoder fitted at week 0, tested on held-out blocks aged by the model; paired 95 % interval against left alone |
+| R², 0.48 µW chain, Nason, GRU | week 0: 0.720; week 39: 0.587 left alone, 0.627 with running z-score (+0.040 [+0.028, +0.053]), 0.631 refitted; week 104: 0.395 left alone, 0.450 with running z-score | 0.48 µW per channel; decoder fitted at week 0, tested on held-out blocks aged by the model; paired 95 % interval against left alone |
+| R², conventional chain, Nason, Wiener | week 0: 0.478; week 39: 0.251 left alone, 0.327 with running z-score (+0.076 [+0.067, +0.085]), 0.351 refitted; week 104: 0.132 left alone, 0.246 with running z-score | 19.63 µW per channel; decoder fitted at week 0, tested on held-out blocks aged by the model; paired 95 % interval against left alone |
+| R², conventional chain, Nason, GRU | week 0: 0.713; week 39: 0.208 left alone, 0.544 with running z-score (+0.336 [+0.309, +0.364]), 0.587 refitted; week 104: 0.009 left alone, 0.394 with running z-score | 19.63 µW per channel; decoder fitted at week 0, tested on held-out blocks aged by the model; paired 95 % interval against left alone |
+| R², conventional chain, NoMAD session 2, Wiener | week 0: 0.650; week 39: 0.338 left alone, 0.584 with running z-score (+0.247 [+0.209, +0.291]), 0.596 refitted; week 104: 0.236 left alone, 0.489 with running z-score | 19.63 µW per channel; decoder fitted at week 0, tested on held-out blocks aged by the model; paired 95 % interval against left alone |
+| R², conventional chain, NoMAD session 2, GRU | week 0: 0.655; week 39: 0.261 left alone, 0.630 with running z-score (+0.369 [+0.263, +0.451]), 0.578 refitted; week 104: 0.172 left alone, 0.561 with running z-score | 19.63 µW per channel; decoder fitted at week 0, tested on held-out blocks aged by the model; paired 95 % interval against left alone |
+| Real session pair, ridge | -0.018 left alone, 0.092 with running z-score, 0.208 with 10 aligned latents (+0.226 [+0.185, +0.289]), 0.305 refitted | NoMAD, fitted on session2, tested on session1 273.9 days later; alignment from the first 300 s without labels; refitted: held-out blocks within the later session |
+| Real session pair, Wiener | 0.239 left alone, 0.257 with running z-score, 0.456 with 10 aligned latents (+0.216 [+0.187, +0.241]), 0.539 refitted | NoMAD, fitted on session2, tested on session1 273.9 days later; alignment from the first 300 s without labels; refitted: held-out blocks within the later session |
+| Real session pair, Kalman | 0.119 left alone, 0.200 with running z-score, 0.508 with 10 aligned latents (+0.388 [+0.339, +0.426]), 0.623 refitted | NoMAD, fitted on session2, tested on session1 273.9 days later; alignment from the first 300 s without labels; refitted: held-out blocks within the later session |
+| Real session pair, GRU | 0.131 left alone, 0.233 with running z-score, 0.457 with 10 aligned latents (+0.326 [+0.295, +0.344]), 0.565 refitted | NoMAD, fitted on session2, tested on session1 273.9 days later; alignment from the first 300 s without labels; refitted: held-out blocks within the later session |
+| Stimulation shift, Wiener | loss -0.082 left alone, -0.057 with running z-score, -0.045 [-0.059, -0.032] gated by the stimulator, -0.072 refitted | U5's test: 0.48 µW chain, stimulating electrode on the same array, template canceller, decoder fitted before stimulation; R² on stimulated bins against the same decoder with no stimulation |
+| Stimulation shift, GRU | loss -0.091 left alone, -0.035 with running z-score, -0.025 [-0.042, -0.010] gated by the stimulator, -0.011 refitted | U5's test: 0.48 µW chain, stimulating electrode on the same array, template canceller, decoder fitted before stimulation; R² on stimulated bins against the same decoder with no stimulation |
+| Changed assumptions | stabiliser gain +0.015 to +1.020; 0.48 µW chain at least as good as the conventional chain in 10 of 10; worst case R² 0.331 (background noise up 1.53 times) | 9 assumptions changed one at a time; GRU on Nason at week 39; both chains compared with the running z-score |
+| Stabiliser cost | 0.00034 µW per channel (0.07% of the 0.48 µW chain), 44 register bits; latent projection 0.00020 µW | 17 add or shift steps per 50 ms bin and no multiplier, each charged as a 1 pJ multiply (an upper bound); the alignment's axes are found outside the implant |
+<!-- END U6_RESULTS -->
+
 ## Reproduce
 
 Requires [uv](https://docs.astral.sh/uv/) and `make`. Python 3.12 is installed

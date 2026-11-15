@@ -645,6 +645,185 @@ def u5_table(m: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def u6_table(m: dict[str, Any]) -> str:
+    """Build the U6 results table from ``results/u6_metrics.json``."""
+    key, model, decode = m["key"], m["model"], m["decoding"]
+    week, last_week = key["week"], key["last_week"]
+    first, last = model["states"][0], model["states"][-1]
+    fine = model["fine_weeks"]
+    at = min(range(len(fine)), key=lambda i: abs(fine[i] - week))
+    amplitude = model["amplitude"]
+    chains = {"sbp": "0.48 µW chain", "crossings": "conventional chain"}
+    decoders = {"ridge": "ridge", "wiener": "Wiener", "kalman": "Kalman", "gru": "GRU"}
+    datasets = {"nason": "Nason", "nomad_session2": "NoMAD session 2"}
+
+    def pm(row: dict[str, Any], name: str) -> str:
+        return f"{row[name]:+.3f} [{row[name + '_low']:+.3f}, {row[name + '_high']:+.3f}]"
+
+    out: list[tuple[str, str, str]] = [
+        (
+            "Electrode after encapsulation",
+            f"{first['z_1khz_kohm']:.0f} to {last['z_1khz_kohm']:.0f} kΩ at 1 kHz; front-end "
+            f"noise {first['frontend_noise_uv']:.1f} to {last['frontend_noise_uv']:.1f} µV",
+            "Randles electrode plus a series sheath solved for a "
+            f"{m['config']['aging']['impedance_factor_final']:g}-fold rise (Barrese 2013; "
+            "assumption); noise over 300 Hz to 7.5 kHz referred to the tissue signal, "
+            "conventional chain",
+        ),
+        (
+            f"Spike amplitude at week {week:g}",
+            f"median {amplitude['p50'][at]:.2f} of week 0 ({amplitude['p10'][at]:.2f} to "
+            f"{amplitude['p90'][at]:.2f})",
+            f"{m['config']['aging']['amplitude_decline_per_month']:.1%} lost per month on "
+            "average (Chestek 2011; assumption), each channel at its own rate; 10th to 90th "
+            "percentile of channels",
+        ),
+    ]
+    settled = m["response"]["states"][m["response"]["settled"]]
+    grid = m["response"]["amplitude_grid"]
+    out.append(
+        (
+            "Crossings kept by the settled electrode",
+            ", ".join(
+                f"{settled['p_keep'][grid.index(a)]:.0%} at amplitude {a:g}"
+                for a in m["config"]["check_amplitudes"]
+            ),
+            f"MEArec, {m['response']['n_channels']} channels, 13 µV background, thresholds "
+            "recalibrated; share of the week-0 chain's detections of real spikes",
+        )
+    )
+    check = m["bridge_check"]["amplitudes"]
+    half = check[min(check, key=float)]
+    out.append(
+        (
+            f"Bridge check at amplitude {min(check, key=float)}",
+            f"SBP {half['sbp_actual']['r']:.3f} simulated, {half['sbp_predicted']['r']:.3f} "
+            f"bridged; crossings {half['crossings_actual']['r']:.3f} simulated, "
+            f"{half['crossings_predicted']['r']:.3f} bridged",
+            "correlation of the 50 ms feature with the true spike count, mean over MEArec "
+            "channels: the aged feature simulated directly against the bridge's prediction "
+            "from the week-0 feature",
+        )
+    )
+    for condition, info in decode["conditions"].items():
+        for name in ("wiener", "gru"):
+            if name not in key["curves"][condition]:
+                continue
+            curve = key["curves"][condition][name]
+            fixed, zscore = curve["key_fixed"], curve["key_zscore"]
+            value = (
+                f"week 0: {curve['week0']:.3f}; week {week:g}: {fixed['r2']:.3f} left alone, "
+                f"{zscore['r2']:.3f} with running z-score ({pm(zscore, 'gain')})"
+            )
+            if "key_refit" in curve:
+                value += f", {curve['key_refit']['r2']:.3f} refitted"
+            value += f"; week {last_week:g}: {curve['last_fixed']['r2']:.3f} left alone, "
+            value += f"{curve['last_zscore']['r2']:.3f} with running z-score"
+            out.append(
+                (
+                    f"R², {chains[info['chain']]}, {datasets.get(info['dataset'], info['dataset'])}"
+                    f", {decoders[name]}",
+                    value,
+                    f"{info['chain_uw']:.2f} µW per channel; decoder fitted at week 0, tested on "
+                    "held-out blocks aged by the model; paired 95 % interval against left alone",
+                )
+            )
+    cross = m.get("cross_session")
+    if cross:
+        rows = {(r["decoder"], r["mode"]): r for r in cross["rows"]}
+        for name in decoders:
+            if (name, "fixed") not in rows:
+                continue
+            aligned = rows[name, "aligned"]
+            out.append(
+                (
+                    f"Real session pair, {decoders[name]}",
+                    f"{rows[name, 'fixed']['r2']:.3f} left alone, "
+                    f"{rows[name, 'zscore']['r2']:.3f} with running z-score, "
+                    f"{aligned['r2']:.3f} with {cross['n_latents']} aligned latents "
+                    f"({pm(aligned, 'gain')}), {rows[name, 'within']['r2']:.3f} refitted",
+                    f"NoMAD, fitted on {cross['train'].replace('nomad_', '')}, tested on "
+                    f"{cross['test'].replace('nomad_', '')} {cross['days_apart']:.1f} days later; "
+                    f"alignment from the first {cross['calibration_s']:.0f} s without labels; "
+                    "refitted: held-out blocks within the later session",
+                )
+            )
+    stim = m.get("stimulation")
+    if stim:
+        rows = {(r["decoder"], r["mode"]): r for r in stim["rows"]}
+        for name in decoders:
+            if (name, "fixed") not in rows:
+                continue
+            out.append(
+                (
+                    f"Stimulation shift, {decoders[name]}",
+                    f"loss {rows[name, 'fixed']['loss']:+.3f} left alone, "
+                    f"{rows[name, 'zscore']['loss']:+.3f} with running z-score, "
+                    f"{pm(rows[name, 'gated zscore'], 'loss')} gated by the stimulator, "
+                    f"{rows[name, 'refit']['loss']:+.3f} refitted",
+                    f"U5's test: 0.48 µW chain, stimulating electrode on the {stim['scenario']}, "
+                    f"{stim['treatment']} canceller, decoder fitted before stimulation; R² on "
+                    "stimulated bins against the same decoder with no stimulation",
+                )
+            )
+    cheap = next((c for c, i in decode["conditions"].items() if i["chain"] == "sbp"), None)
+    rival = None
+    if cheap is not None:
+        rival = next(
+            (
+                c
+                for c, i in decode["conditions"].items()
+                if i["chain"] == "crossings"
+                and i["dataset"] == decode["conditions"][cheap]["dataset"]
+            ),
+            None,
+        )
+    if m["variations"] and cheap is not None and rival is not None:
+        best = max(key["curves"][cheap], key=lambda d: key["curves"][cheap][d]["week0"])
+        table = {
+            (r["variation"], r["condition"], r["mode"]): r["r2"]
+            for r in decode["rows"]
+            if r["decoder"] == best and r["week"] == week
+        }
+        names = ["baseline", *m["variations"]]
+        gains = {
+            (v, c): table[v, c, "zscore"] - table[v, c, "fixed"]
+            for v in names
+            for c in (cheap, rival)
+        }
+        ahead = sum(table[v, cheap, "zscore"] >= table[v, rival, "zscore"] for v in names)
+        worst = min(names, key=lambda v: table[v, cheap, "zscore"])
+        out.append(
+            (
+                "Changed assumptions",
+                f"stabiliser gain {min(gains.values()):+.3f} to {max(gains.values()):+.3f}; "
+                f"0.48 µW chain at least as good as the conventional chain in {ahead} of "
+                f"{len(names)}; worst case R² {table[worst, cheap, 'zscore']:.3f} "
+                f"({worst})",
+                f"{len(names) - 1} assumptions changed one at a time; {decoders[best]} on "
+                f"{datasets.get(decode['conditions'][cheap]['dataset'], 'the dataset')} at week "
+                f"{week:g}; both chains compared with the running z-score",
+            )
+        )
+    cost = m["cost"]
+    zscore_cost = cost["modes"]["zscore"]
+    out.append(
+        (
+            "Stabiliser cost",
+            f"{zscore_cost['uw_per_channel']:.5f} µW per channel "
+            f"({cost['chains']['sbp']['zscore_share_of_chain']:.2%} of the 0.48 µW chain), "
+            f"{zscore_cost['register_bits_per_channel']} register bits; latent projection "
+            f"{cost['modes']['aligned']['uw_per_channel']:.5f} µW",
+            f"{zscore_cost['operations_per_bin']} add or shift steps per 50 ms bin and no "
+            "multiplier, each charged as a 1 pJ multiply (an upper bound); the alignment's "
+            "axes are found outside the implant",
+        )
+    )
+    lines = ["| Quantity | Value | How it is defined |", "|---|---|---|"]
+    lines += [f"| {name} | {value} | {note} |" for name, value, note in out]
+    return "\n".join(lines)
+
+
 TABLES = {
     "U0_RESULTS": ("u0_metrics.json", u0_table),
     "U1_RESULTS": ("u1_metrics.json", u1_table),
@@ -652,6 +831,7 @@ TABLES = {
     "U3_RESULTS": ("u3_metrics.json", u3_table),
     "U4_RESULTS": ("u4_metrics.json", u4_table),
     "U5_RESULTS": ("u5_metrics.json", u5_table),
+    "U6_RESULTS": ("u6_metrics.json", u6_table),
 }
 
 

@@ -3,6 +3,7 @@ import pytest
 
 from neurochain.adc import Adc
 from neurochain.bridge import (
+    age_sbp,
     degrade_crossings,
     degrade_sbp,
     sbp_floor,
@@ -96,3 +97,58 @@ def test_digital_band_counts_only_in_band_noise() -> None:
     front_end = (wide.band_noise(300.0, 1000.0).total_v * 1e6) ** 2
     quantisation = adc.lsb_uv**2 / 12 * 700.0 / 15_000.0
     assert ratio == pytest.approx(1.0 + (front_end + quantisation) / background, rel=0.01)
+
+
+def test_thinning_takes_one_probability_per_channel() -> None:
+    rng = np.random.default_rng(3)
+    counts = rng.poisson(5.0, size=(20_000, 3)).astype(float)
+    keep = np.array([1.0, 0.5, 0.0])
+    thinned = degrade_crossings(counts, keep, np.array([0.0, 0.0, 4.0]), 0.05, rng)
+    assert np.array_equal(thinned[:, 0], counts[:, 0])
+    assert thinned[:, 1].mean() == pytest.approx(0.5 * counts[:, 1].mean(), rel=0.03)
+    assert thinned[:, 2].mean() == pytest.approx(4.0 * 0.05, rel=0.05)
+    with pytest.raises(ValueError, match="between 0 and 1"):
+        degrade_crossings(counts, np.array([0.2, 1.1, 0.3]), 0.0, 0.05, rng)
+
+
+def _noisy_sbp(seed: int = 4) -> tuple[np.ndarray, np.ndarray, float]:
+    """SBP of pure noise in half the bins and of noise plus spikes in the other half."""
+    rng = np.random.default_rng(seed)
+    n_effective = 70.0
+    floor = np.array([10.0, 20.0])
+    scatter = floor * np.sqrt((np.pi / 2.0 - 1.0) / n_effective)
+    signal = np.where(np.arange(40_000)[:, None] % 2 == 0, 0.0, 8.0)
+    level = np.sqrt(floor**2 + signal**2)
+    return level + scatter * rng.standard_normal((40_000, 2)), floor, n_effective
+
+
+def test_aging_sbp_with_nothing_changed_is_the_u3_bridge() -> None:
+    sbp, floor, n_effective = _noisy_sbp()
+    aged = age_sbp(sbp, 1.0, 1.3, floor, n_effective=n_effective, rng=np.random.default_rng(9))
+    same = degrade_sbp(sbp, 1.3, floor, n_effective=n_effective, rng=np.random.default_rng(9))
+    assert np.allclose(aged, same)
+    untouched = age_sbp(sbp, 1.0, 1.0, floor, n_effective=n_effective, rng=np.random.default_rng(9))
+    assert np.allclose(untouched, sbp)
+
+
+def test_aging_sbp_shrinks_the_signal_but_not_the_noise() -> None:
+    sbp, floor, n_effective = _noisy_sbp()
+    quiet, active = slice(0, None, 2), slice(1, None, 2)
+    aged = age_sbp(
+        sbp, np.array([0.5, 0.5]), 1.0, floor, n_effective=n_effective,
+        rng=np.random.default_rng(1),
+    )  # fmt: skip
+    # Mean-square values add: the step between quiet and active bins shrinks
+    # from sqrt(f^2 + s^2) - f to sqrt(f^2 + (s/2)^2) - f.
+    for channel in range(2):
+        expected = np.sqrt(floor[channel] ** 2 + 4.0**2) - floor[channel]
+        step = aged[active, channel].mean() - aged[quiet, channel].mean()
+        assert step == pytest.approx(expected, rel=0.08)
+        # The scatter of noise-only bins is the noise's own and must not shrink.
+        assert aged[quiet, channel].std() == pytest.approx(sbp[quiet, channel].std(), rel=0.05)
+    gained = age_sbp(
+        sbp, 1.0, 1.0, floor, gain=0.9, n_effective=n_effective, rng=np.random.default_rng(1)
+    )
+    assert np.allclose(gained, 0.9 * sbp)
+    with pytest.raises(ValueError, match="between 0 and 1"):
+        age_sbp(sbp, 1.2, 1.0, floor, n_effective=n_effective, rng=np.random.default_rng(1))

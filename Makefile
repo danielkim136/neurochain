@@ -1,6 +1,6 @@
 # NeuroChain: one command per result. Run `make help` for the list.
 .DEFAULT_GOAL := help
-.PHONY: help setup data data-status data-describe mearec u0 u1 u1-key u2 u2-key u3 u3-key u4 u4-key u5 u5-key u0-key readme test test-fast lint format clean
+.PHONY: help setup data data-status data-describe mearec u0 u1 u1-key u2 u2-key u3 u3-key u4 u4-key u5 u5-key u6 u6-key u0-key readme test test-fast lint format clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-12s %s\n", $$1, $$2}'
@@ -70,6 +70,14 @@ u5: ## U5: stimulation artifacts, recovery in ngspice, cancellation, decoding, R
 
 u5-key: ## U5: print the key numbers (add ARGS="--adapt-shift 1" to change one setting)
 	uv run python scripts/u5_key_number.py $(ARGS)
+
+u6: ## U6: electrode aging, stabilisers, the real NoMAD session pair, README table (about four minutes)
+	uv run python scripts/u6_figures.py
+	uv run python scripts/update_readme.py
+	uv run python scripts/u6_key_number.py
+
+u6-key: ## U6: print the key numbers (add ARGS="--shift 6" to change one setting)
+	uv run python scripts/u6_key_number.py $(ARGS)
 
 readme: ## Regenerate the README results tables from results/*.json
 	uv run python scripts/update_readme.py

@@ -14,7 +14,9 @@ and apply the same change to recorded features.
 * **Spiking-band power.** SBP is the mean absolute value of a band signal, and
   for independent sources mean-square values add. A worse chain adds noise
   power, so the recorded SBP is raised in quadrature by a multiple of each
-  channel's own noise floor, and each bin's average becomes noisier.
+  channel's own noise floor, and each bin's average becomes noisier. An aged
+  electrode also shrinks the spikes, which scales the part above the floor
+  (:func:`age_sbp`, U6).
 
 Both operations are relative to the chain that made the recording, which is
 taken to be as good as the project's reference chain. A configuration can
@@ -33,8 +35,8 @@ from neurochain.recording import FloatArray
 
 def degrade_crossings(
     counts: FloatArray,
-    p_keep: float,
-    extra_rate_hz: float,
+    p_keep: float | FloatArray,
+    extra_rate_hz: float | FloatArray,
     bin_s: float,
     rng: np.random.Generator,
 ) -> FloatArray:
@@ -42,15 +44,19 @@ def degrade_crossings(
 
     Args:
         counts: ``(n_bins, n_channels)`` recorded counts.
-        p_keep: Probability that a recorded event survives the worse chain.
-        extra_rate_hz: False positives added per channel per second.
+        p_keep: Probability that a recorded event survives the worse chain;
+            one value, or one per channel.
+        extra_rate_hz: False positives added per channel per second; one
+            value, or one per channel.
         bin_s: Bin width in seconds.
         rng: Random generator.
     """
-    if not 0.0 <= p_keep <= 1.0:
+    keep = np.asarray(p_keep, dtype=np.float64)
+    extra = np.asarray(extra_rate_hz, dtype=np.float64)
+    if np.any(keep < 0.0) or np.any(keep > 1.0):
         raise ValueError("p_keep must be between 0 and 1")
-    kept = rng.binomial(np.rint(counts).astype(np.int64), p_keep)
-    added = rng.poisson(extra_rate_hz * bin_s, size=counts.shape) if extra_rate_hz > 0 else 0
+    kept = rng.binomial(np.rint(counts).astype(np.int64), keep)
+    added = rng.poisson(extra * bin_s, size=counts.shape) if np.any(extra > 0) else 0
     return np.asarray(kept + added, dtype=np.float64)
 
 
@@ -112,6 +118,57 @@ def degrade_sbp(
     raised = np.sqrt(sbp**2 + added * floor**2)
     jitter = floor * np.sqrt(added * (np.pi / 2.0 - 1.0) / n_effective)
     return np.asarray(raised + jitter * rng.standard_normal(sbp.shape), dtype=np.float64)
+
+
+def age_sbp(
+    sbp: FloatArray,
+    amplitude_scale: float | FloatArray,
+    noise_power_ratio: float,
+    floor: FloatArray,
+    *,
+    gain: float = 1.0,
+    n_effective: float,
+    rng: np.random.Generator,
+) -> FloatArray:
+    """Change recorded SBP the way an aged electrode would.
+
+    Recorded SBP squared is split into the noise floor squared and what the
+    spikes add on top (mean-square values add). Aging then does three things:
+
+    * spikes shrink, so the part above the floor is multiplied by
+      ``amplitude_scale**2``;
+    * noise power is added, exactly as in :func:`degrade_sbp`;
+    * the whole feature is multiplied by ``gain``, the front end's loss of
+      gain into a higher source impedance, which the implant cannot know.
+
+    One correction matters. Most of a recorded bin's scatter around the floor
+    is not spikes: it is the noise itself, averaged over a finite number of
+    samples (standard deviation ``floor * sqrt((pi/2 - 1) / n_effective)``).
+    Shrinking the part above the floor shrinks that scatter too, by
+    ``amplitude_scale**2``, although the noise has not changed. The missing
+    variance, ``1 - amplitude_scale**4`` of it, is put back. Without this the
+    aged feature would keep its signal-to-noise ratio, which a direct
+    simulation on MEArec shows it does not.
+
+    Args:
+        sbp: ``(n_bins, n_channels)`` recorded SBP, any unit.
+        amplitude_scale: Spike amplitude relative to the recording, at most 1;
+            one value, or one per channel.
+        noise_power_ratio: Total over recorded noise power; at least 1.
+        floor: ``(n_channels,)`` noise-only SBP level, same unit as ``sbp``.
+        gain: Feature gain relative to the recording.
+        n_effective: Independent samples averaged per bin.
+        rng: Random generator.
+    """
+    scale = np.asarray(amplitude_scale, dtype=np.float64)
+    if np.any(scale < 0.0) or np.any(scale > 1.0):
+        raise ValueError("amplitude_scale must be between 0 and 1")
+    shrunk = np.sqrt(np.maximum(floor**2 + scale**2 * (sbp**2 - floor**2), 0.0))
+    aged = degrade_sbp(shrunk, noise_power_ratio, floor, n_effective=n_effective, rng=rng)
+    if np.any(scale < 1.0):
+        restored = floor * np.sqrt((1.0 - scale**4) * (np.pi / 2.0 - 1.0) / n_effective)
+        aged = aged + restored * rng.standard_normal(sbp.shape)
+    return np.asarray(gain * aged, dtype=np.float64)
 
 
 def sbp_noise_power_ratio(
