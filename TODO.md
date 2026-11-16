@@ -39,17 +39,20 @@ Carried forward from U0:
 
 What opening the files showed, for the units that use them:
 
-- [ ] **U6 cannot age NoMAD waveforms, because there are none.** NoMAD holds
+- [x] **U6 cannot age NoMAD waveforms, because there are none.** NoMAD holds
       threshold crossings in 20 ms bins: no broadband, no spike shapes, no
       electrode table, no impedance. Impedance, noise and amplitude drift
       therefore have to be modelled as changes to crossing counts (for example
       through an amplitude-distribution model fitted on Neuralink or Nason
       broadband), or the aging model has to be validated on broadband data and
       only its effect carried to NoMAD. Decide this in `docs/U6_design.md`.
-- [ ] **NoMAD is two sessions 273.9 days apart, and `session2` is the earlier
+      (done in U6: aged on MEArec through the U1 front end and carried over by
+      the bridge; `docs/U6_design.md` section 2)
+- [x] **NoMAD is two sessions 273.9 days apart, and `session2` is the earlier
       one.** Held-out-session evaluation means train on one, test on the other.
       U6's "R² vs simulated weeks" comes from the aging model; the real pair
       gives one measured point at about 39 weeks to compare it with.
+      (done in U6: used as the one measured point, week 39)
 - [ ] **NoMAD time is not continuous:** 255 contiguous segments in `session1`
       (some one bin long) and 16 in `session2`. Decoders and any filtering must
       respect `NomadSession.segment_starts`. Only about 37 % of bins fall
@@ -201,8 +204,10 @@ Carried forward from U3:
       slightly pessimistic for crossings and slightly optimistic for SBP.
 - [x] **U4 must repeat the SBP-versus-crossings comparison with the Kalman
       filter and GRU** (done in U4: the choice survives every decoder), at least at the conventional chain and the winner.
-- [ ] **U6: a fixed decoder does not transfer across NoMAD's sessions**
-      (R² -0.01 and -0.07). No front-end choice fixes that.
+- [x] **U6: a fixed decoder does not transfer across NoMAD's sessions**
+      (R² -0.01 and -0.07). No front-end choice fixes that. (done in U6: the
+      channel-to-neuron map changed; 10 aligned latents lift the Wiener filter
+      from 0.239 to 0.456, a z-score only to 0.257)
 - [ ] **The wideband chain's ADC range is too small for real LFP**, which the
       sweep did not charge it for. A fair crossings chain needs either more bits
       or a higher analog corner.
@@ -234,9 +239,11 @@ Carried forward from U4:
 - [ ] **The GRU result depends on its size.** With 8 hidden units instead of 64,
       U3's choice loses 0.098 against the conventional chain (prediction
       check 2). "Survives every decoder" holds for the decoders as configured.
-- [ ] **U6: cross-session decoding.** Fitted on one NoMAD session and tested on
+- [x] **U6: cross-session decoding.** Fitted on one NoMAD session and tested on
       the other, the best decoder (Wiener) scores R² 0.24; the GRU and Kalman
-      filter transfer worse. U6 tests why, together with a stabiliser.
+      filter transfer worse. U6 tests why, together with a stabiliser. (done in
+      U6: aligned latents give 0.456 Wiener, 0.508 Kalman, 0.457 GRU, against
+      0.539, 0.623 and 0.565 refitted)
 
 ## U5: stimulation artifacts (B) — DONE
 
@@ -256,6 +263,9 @@ Carried forward from U5:
 
 - [ ] **Decoders must be calibrated with stimulation on**; a GRU fitted without it loses 0.09
       to 0.37. U6 should test whether its stabiliser also absorbs this shift.
+      (U6: partly; a z-score gated by the stimulator cuts the GRU's loss from
+      0.091 to 0.025, refitting reaches 0.011. Calibrating with stimulation on
+      is still the safer rule.)
 - [ ] **With a Wiener filter the 0.48 µW chain loses 0.072 R²** under same-array stimulation
       even refitted; the conventional chain loses nothing.
 - [ ] **U7: the RTL reference for the canceller** is `neurochain.stim.cancel.cancel_template`
@@ -269,13 +279,41 @@ Carried forward from U5:
 - [ ] **The new ngspice transient tests have run only on macOS ngspice 47**; confirm CI
       (ngspice 45, Linux).
 
-## U6: aging stress test (C)
+## U6: aging stress test (C) — DONE
 
 Done-criterion: R² versus simulated weeks.
 
-- [ ] Encapsulation and impedance drift model applied to NoMAD data
-- [ ] Comparison with a simple stabiliser
-- [ ] `docs/U6_design.md`, key-number script, three prediction checks
+- [x] Encapsulation and impedance drift model applied to NoMAD data: a series sheath on the Randles electrode and a per-channel amplitude decline (`aging.py`), measured on MEArec and carried to Nason and NoMAD by the bridge (`bridge.age_sbp`)
+- [x] Comparison with a simple stabiliser: running z-score with optional stimulator gating (`stabilise.py`), refitting, and latent alignment on the real NoMAD pair (`align.py`)
+- [x] `docs/U6_design.md` with prediction checks, `make u6-key`, `make u6` writes five figures, `results/u6_metrics.json` and the README table
+
+Key number: after 39 simulated weeks of electrode aging, the 0.48 µW chain with a GRU
+decodes at R² 0.587 left alone and 0.627 behind a running z-score that costs
+0.00034 µW per channel (week 0: 0.720; refitted: 0.631), while the conventional
+19.6 µW chain goes from 0.713 to 0.208 left alone and 0.544 stabilised.
+
+Carried forward from U6:
+
+- [ ] **1. Across the real sessions the channel-to-neuron map changed, not channel gains:**
+      z-score lifts the Wiener filter by only 0.018 (0.239 to 0.257); aligned latents by
+      0.216 (to 0.456 of a refitted 0.539).
+- [ ] **2. The alignment's size was not chosen blind:** 10 latents give 0.456, 5 give
+      0.378, 20 give 0.305 (Wiener), on the only pair available.
+- [ ] **3. The aging model only removes spikes**, yet 41 % of real channels fired more;
+      R² against simulated weeks is optimistic for real use.
+- [ ] **4. The stabiliser has no integer reference.** If U7 builds it: 17 add or shift
+      steps per bin, 44 register bits per channel.
+- [ ] **5. `shift = 10` is a compromise:** `shift 6` gives the GRU 0.637 on Nason (from
+      0.627) but 0.594 on NoMAD (from 0.630).
+- [ ] **6. U5's "calibrate with stimulation on" softens:** a gated z-score cuts the GRU's
+      loss from 0.091 to 0.025 (refitting: 0.011).
+- [ ] **7. Worst case is a rising background:** 1.53 times more leaves the stabilised
+      0.48 µW chain at 0.331.
+- [ ] **8. The Kalman filter gains nothing from the stabiliser on Nason** (0.290 to 0.294)
+      and is worse refitted (0.262).
+- [ ] **9. The SBP chain could not be tested on NoMAD** (no SBP in either session).
+- [ ] **10. Verify before quoting:** the 2.4 % per month comes from Barrese et al.'s
+      summary of Chestek et al., and the Schönemann (1966) DOI is from memory.
 
 ## U7: RTL
 

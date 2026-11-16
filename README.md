@@ -27,8 +27,8 @@ The project has three parts:
 | U3 | Power model and co-design: accuracy vs µW Pareto | **Done** |
 | U4 | Kalman and GRU decoders, session-held-out evaluation | **Done** |
 | U5 | Stimulation artifacts and fixed-point cancellation: R² 0.707 refitted with stimulation against 0.718 without, 2.95 ms recovery | **Done** |
-| U6 | Electrode aging stress test | Next |
-| U7 | RTL (SystemVerilog), bit-exact tests, ECP5 synthesis | Planned |
+| U6 | Electrode aging stress test: after 39 simulated weeks the 0.48 µW chain's GRU keeps R² 0.627 behind a 0.00034 µW stabiliser (week 0: 0.720) | **Done** |
+| U7 | RTL (SystemVerilog), bit-exact tests, ECP5 synthesis | Next |
 | U8 | ADS1299 board, saline phantom, stimulator: design for later build | Planned |
 
 Done-criteria for each unit are in [TODO.md](TODO.md).
@@ -459,6 +459,12 @@ output. Reasoning and prediction checks: [docs/U5_design.md](docs/U5_design.md).
 
 ### U6: does decoding survive an aging electrode?
 
+An implanted electrode does not stay as it went in: tissue encapsulates it, its
+impedance rises and the spikes it sees shrink. U6 models that aging on MEArec
+through the U1 front end, carries its effect onto the recorded Nason and NoMAD
+features with the bridge, and scores decoders fitted at week 0 on data aged by
+the model, left alone, behind a running z-score stabiliser and refitted. The real
+NoMAD session pair, 273.9 days apart, is the one measured point to compare with.
 Reasoning and prediction checks: [docs/U6_design.md](docs/U6_design.md).
 
 <!-- BEGIN U6_RESULTS -->
@@ -484,6 +490,26 @@ Reasoning and prediction checks: [docs/U6_design.md](docs/U6_design.md).
 | Stabiliser cost | 0.00034 µW per channel (0.07% of the 0.48 µW chain), 44 register bits; latent projection 0.00020 µW | 17 add or shift steps per 50 ms bin and no multiplier, each charged as a 1 pJ multiply (an upper bound); the alignment's axes are found outside the implant |
 <!-- END U6_RESULTS -->
 
+![Electrode impedance fresh and settled, spike amplitude against weeks, and crossings kept against amplitude](figures/u6_aging_model.png)
+
+*The aging model: |Z| at 1 kHz rises from 218 to 540 kΩ as the sheath settles, spike amplitude declines by 2.4 % per month on average, and on MEArec the settled electrode alone keeps 79 % of crossings. Front-end noise of the conventional chain rises from 3.4 to 7.9 µV.*
+
+![R² against simulated weeks for both chains, left alone, stabilised and refitted](figures/u6_r2_vs_weeks.png)
+
+*The done-criterion. At week 39 the 0.48 µW chain's GRU scores 0.587 left alone, 0.627 stabilised and 0.631 refitted (week 0: 0.720); the conventional chain falls from 0.713 to 0.208 left alone and recovers to 0.544 stabilised.*
+
+![The real NoMAD session pair next to the same gap simulated](figures/u6_cross_session.png)
+
+*Across the real 273.9-day gap the z-score lifts the Wiener filter only from 0.239 to 0.257, while 10 aligned latents reach 0.456 against 0.539 refitted: the channel-to-neuron map changed, not the channel gains.*
+
+![GRU at week 39 under nine changed assumptions](figures/u6_robustness.png)
+
+*The GRU on Nason at week 39 under nine assumptions changed one at a time, for both chains. The stabiliser helped in all 20 cases; the worst is a background 1.53 times louder, which leaves the stabilised 0.48 µW chain at 0.331.*
+
+![U5's stimulation shift behind the plain and the gated z-score, against refitting](figures/u6_stimulation.png)
+
+*U5's same-array stimulation shift. A z-score gated by the stimulator cuts the GRU's loss from 0.091 to 0.025, against 0.011 for a decoder refitted with stimulation on.*
+
 ## Reproduce
 
 Requires [uv](https://docs.astral.sh/uv/) and `make`. Python 3.12 is installed
@@ -498,6 +524,7 @@ make u2        # U2 figures, metrics and table (needs `make mearec` and the Naso
 make u3        # U3 power sweep, figures, metrics and table (about four minutes)
 make u4        # U4 decoders, figures, metrics and table (about three minutes)
 make u5        # U5 figures, metrics, netlist and table (about a minute; needs ngspice, `make mearec` and the Nason data)
+make u6        # U6 aging sweep, figures, metrics and table (about four minutes; needs `make mearec`, the Nason data and both NoMAD sessions)
 make u5-key    # U5 key numbers; ARGS="--adapt-shift 1" changes one setting
 make test      # 309 tests; the ones needing data or ngspice skip if absent
 ```
@@ -532,12 +559,17 @@ src/neurochain/
   features/             causal spike detectors, spiking-band power, scoring
   fixedpoint.py         integer-only versions of the feature paths
   power.py              per-stage power model: amplifier, ADC, logic, radio
-  bridge.py             carries a chain's effect onto recorded features
+  bridge.py             carries a chain's effect onto recorded features,
+                        including aged SBP and per-channel crossing loss
+  aging.py              electrode encapsulation and amplitude decline model
+  stabilise.py          running mean and z-score stabiliser, optional gating
+  align.py              principal axes and Procrustes alignment across sessions
   stim/                 pulse.py (charge-balanced pulses), propagation.py (artifact
                         in tissue), cancel.py (blanking and template canceller)
   decode/               ridge and Wiener (ridge.py), kalman.py, gru.py, evaluate.py
   analysis/             per-unit analyses and their figures (u3.py: co-design sweep;
-                        u4.py: decoder comparison; u5.py: stimulation)
+                        u4.py: decoder comparison; u5.py: stimulation;
+                        u6.py: aging)
   viz.py                shared figure style
 scripts/                one script per figure or key number
 tests/                  pytest; no test needs downloaded data unless marked `data`
@@ -558,6 +590,7 @@ checks: change one parameter, predict the result, then run it.
 - [U3: power model and co-design](docs/U3_design.md)
 - [U4: decoders and evaluation](docs/U4_design.md)
 - [U5: stimulation artifacts](docs/U5_design.md)
+- [U6: aging stress test](docs/U6_design.md)
 - [References](docs/references.md)
 
 ## Safety

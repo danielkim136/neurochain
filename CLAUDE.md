@@ -118,6 +118,8 @@ make u4        # U4 decoders, figures, metrics, README table (about three minute
 make u4-key    # U4 key numbers; ARGS="--gru-hidden 8" changes one decoder setting
 make u5        # U5 figures, metrics, netlist, README table; about a minute; needs ngspice, `make mearec`, Nason data
 make u5-key    # U5 key numbers; ARGS="--adapt-shift 1" changes one setting; run one at a time, 16 GB RAM
+make u6        # U6 aging sweep, figures, metrics, README table; about four minutes; needs `make mearec`, Nason data, both NoMAD sessions
+make u6-key    # U6 key numbers; ARGS="--shift 6" changes one setting; run one at a time, 16 GB RAM
 make test      # pytest
 make lint      # ruff + mypy
 ```
@@ -231,6 +233,26 @@ Run Python through uv: `uv run python ...`, `uv run pytest`.
   bins, with paired differences against no stimulation, and say whether the
   decoder was fitted with or without stimulation.
 - **Report canceller cost** in µW per channel (0.004 µW at 2 kS/s).
+
+## Aging conventions (set in U6)
+
+- **Aging model:** a series sheath on the Randles electrode solved for a 2.48-fold
+  rise of |Z| at 1 kHz within two weeks, plus a 2.4 % per month mean amplitude
+  decline with a per-channel rate. All parameters are assumptions; conclusions
+  must survive the nine variations in `u6.variations`.
+- **"Simulated weeks"** means a decoder fitted at week 0 and tested on held-out
+  folds aged by the model. Week 39 is the key week (NoMAD's real gap); week 0
+  equals U4's number.
+- **Three treatments are always reported together:** left alone, running
+  z-score, refitted; `loss` is paired against week 0, `gain` against left alone.
+- **The stabiliser** is `stabilise.normalise`: `shift = 10` (1024 bins), gain
+  limit 4, cold start from the fit-time constants, decoder not refitted. Cost in
+  µW per channel (0.00034).
+- **Thresholds are recalibrated each session** as part of the baseline chain;
+  fixed thresholds are a variation.
+- **Simulated and real gaps are reported separately.** The real NoMAD pair is the
+  only measured point; the latent alignment (10 axes, first 300 s unlabelled) is
+  only scored there.
 
 ## Toolchain status
 

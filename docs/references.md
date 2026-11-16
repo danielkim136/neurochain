@@ -105,7 +105,7 @@ first uses them. DOIs were resolved on 2026-11-13.
   wireless communication for weakly coupled implantable brain-computer
   interfaces. <https://arxiv.org/abs/2609.05786>. The sub-10 pJ/bit target used
   for the radio, and the roughly 10 mW a link can dissipate.
-- **Karpowicz, B. M. et al. (2025)** (listed below). The NoMAD data the Pareto
+- **Karpowicz, B. M. et al. (2025)** (listed under U6). The NoMAD data the Pareto
   is also evaluated on.
 
 ## U4: decoders and evaluation
@@ -172,8 +172,50 @@ first uses them. DOIs were resolved on 2026-11-13.
   <https://doi.org/10.1038/s41551-018-0323-x>. Alternative considered: a front
   end with enough range never to saturate.
 
-## Later units (listed in the plan, not yet relied on)
+## U6: aging stress test
 
+- **Barrese, J. C., Rao, N., Paroo, K., Triebwasser, C., Vargas-Irwin, C.,
+  Franquemont, L. and Donoghue, J. P. (2013).** Failure mode analysis of
+  silicon-based intracortical microelectrode arrays in non-human primates.
+  *Journal of Neural Engineering* 10(6), 066014.
+  <https://doi.org/10.1088/1741-2560/10/6/066014>. The impedance rise (2.48
+  times in two weeks, then stable), the 1.53-fold noise rise used as a
+  variation, and the quoted Chestek figure.
+- **Chestek, C. A. et al. (2011).** Long-term stability of neural prosthetic
+  control signals from silicon cortical arrays in rhesus macaque motor cortex.
+  *Journal of Neural Engineering* 8(4), 045005.
+  <https://doi.org/10.1088/1741-2560/8/4/045005>. The 2.4 % per month decline
+  in spike amplitude, taken from Barrese et al.'s summary and not checked
+  against the original text. Verify before quoting.
+- **Straka, M. M. et al. (2018)** (listed under U1). The fresh electrode, and
+  the reason its implanted fit was not used.
+- **Williams, J. C., Hippensteel, J. A., Dilgen, J., Shain, W. and Kipke, D. R.
+  (2007).** Complex impedance spectroscopy for monitoring tissue responses to
+  inserted neural implants. *Journal of Neural Engineering* 4(4), 410-423.
+  <https://doi.org/10.1088/1741-2560/4/4/007>. Encapsulation modelled as added
+  tissue impedance (only a summary was read).
+- **Sankar, V. et al. (2014).** Electrode impedance analysis of chronic
+  tungsten microwire neural implants: understanding abiotic vs. biotic
+  contributions. *Frontiers in Neuroengineering* 7, 13.
+  <https://doi.org/10.3389/fneng.2014.00013>. Impedance rises and later falls;
+  the fall is not modelled.
 - **Karpowicz, B. M. et al. (2025).** Stabilizing brain-computer interfaces
   through alignment of latent dynamics. *Nature Communications* 16, 4662.
-  <https://doi.org/10.1038/s41467-025-59652-y>. U6.
+  <https://doi.org/10.1038/s41467-025-59652-y>. The NoMAD sessions and the idea
+  of unsupervised alignment; its nonlinear, recurrent method is not implemented.
+- **Degenhart, A. D. et al. (2020).** Stabilization of a brain-computer
+  interface via the alignment of low-dimensional spaces of neural activity.
+  *Nature Biomedical Engineering* 4(7), 672-685.
+  <https://doi.org/10.1038/s41551-020-0542-9>. The linear precedent for
+  `neurochain.align`, which uses a simpler principal-axes and Procrustes version.
+- **Jarosiewicz, B. et al. (2015).** Virtual typing by people with tetraplegia
+  using a self-calibrating intracortical brain-computer interface. *Science
+  Translational Medicine* 7(313), 313ra179.
+  <https://doi.org/10.1126/scitranslmed.aac7328>. Tracking feature statistics
+  during use instead of recalibrating.
+- **Schönemann, P. H. (1966).** A generalized solution of the orthogonal
+  Procrustes problem. *Psychometrika* 31(1), 1-10.
+  <https://doi.org/10.1007/BF02289451>. The `U·Vᵀ` solution in
+  `align.procrustes_rotation` (citation from memory; verify the DOI).
+- **Nason, S. R. et al. (2020)** (listed under U0) and **Buccino, A. P. and
+  Einevoll, G. T. (2021)** (listed under U2). SBP and the Nason data; MEArec.
