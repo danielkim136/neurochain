@@ -120,6 +120,8 @@ make u5        # U5 figures, metrics, netlist, README table; about a minute; nee
 make u5-key    # U5 key numbers; ARGS="--adapt-shift 1" changes one setting; run one at a time, 16 GB RAM
 make u6        # U6 aging sweep, figures, metrics, README table; about four minutes; needs `make mearec`, Nason data, both NoMAD sessions
 make u6-key    # U6 key numbers; ARGS="--shift 6" changes one setting; run one at a time, 16 GB RAM
+make u7        # U7 bit-exactness, ECP5 synthesis, power estimate, figures, README table; about 1.5 minutes; needs the Neuralink clips, Verilator, Yosys, nextpnr-ecp5
+make u7-key    # U7 key numbers; ARGS="--channels 1024" changes one setting (rebuilds, 1 to 3 minutes); run one at a time
 make test      # pytest
 make lint      # ruff + mypy
 ```
@@ -195,7 +197,7 @@ Run Python through uv: `uv run python ...`, `uv run pytest`.
   judge a chain by its correlation with another chain's features: that
   penalises being different, not being worse.
 - **Winning path:** SBP from a 300 Hz to 1 kHz amplifier at 250 nA, 8 bits,
-  2 kS/s: 0.48 µW per channel. This is what U7 implements.
+  2 kS/s: 0.48 µW per channel. U7 implements it in RTL (`rtl/`).
 - **Held-out** means contiguous blocks of trials within a session. NoMAD's two
   sessions do not support cross-session evaluation with a fixed decoder.
 
@@ -254,7 +256,37 @@ Run Python through uv: `uv run python ...`, `uv run pytest`.
   only measured point; the latent alignment (10 axes, first 300 s unlabelled) is
   only scored there.
 
+## RTL conventions (set in U7)
+
+- **The Python integer chain is the specification:**
+  `neurochain.rtl.spec.ChainSpec.reference` (`cancel_template`, then
+  `fixed_highpass` with no guard bits, then `fixedpoint.fixed_masked_sbp`).
+  "Bit-exact" means zero mismatches on canceller output, blanking flag and
+  filter output per sample and on sum and count per bin.
+- **Word widths are worst-case bounds** derived in `ChainSpec`, never peaks
+  measured on data. The 2 kS/s filter accumulator is 20 bits with the canceller
+  in front (U2's measured 18 fails).
+- **Bit-exactness data:** Neuralink clips, band-passed 300 Hz to 1 kHz, sampled
+  at 2 kS/s, 10-bit codes divided by 4, 96 channels × 600 s, seed 0, U5
+  artifacts added before rounding. Amplitudes stay in LSB.
+- **Architecture:** one pipelined datapath shared by all channels, one
+  channel-sample per clock (clock = channels × 2 kHz), state in RAM (307 bits
+  per channel); the same channel is never presented on consecutive clock edges;
+  pulses at least 16 samples apart; the implant sends a sum and a valid count
+  per bin (no divider).
+- **ECP5 numbers** come from Yosys `synth_ecp5 -nodsp` and nextpnr-ecp5 for
+  LFE5U-25F, CABGA256, speed grade 6; fmax is the median and range of placement
+  seeds 1 to 3; LUT counts are reported without hard multipliers.
+- **Digital power is an ASIC estimate, not FPGA power:** gate-level toggle
+  counts from simulation times assumed energies (1.44 fJ per toggle at 2 fF and
+  1.2 V, 20 fJ per memory bit accessed, 5 pW leakage per gate and bit); always
+  quote the tenth-to-tenfold range. Tool tests skip when Verilator, Yosys or
+  nextpnr is absent.
+
 ## Toolchain status
 
-Installed: uv, git, gh, make, ngspice 47. Not yet installed (install when the
-unit needs them, via Homebrew): verilator, yosys, nextpnr-ecp5 (U7), KiCad (U8).
+Installed: uv, git, gh, make, ngspice 47; Verilator 5.054, Yosys 0.71 and
+Project Trellis 1.4 through Homebrew. nextpnr-ecp5 0.11.1 has no Homebrew
+formula; it was built from the `nextpnr-0.11.1` source archive into
+`~/.local/bin/nextpnr-ecp5` (`NEUROCHAIN_NEXTPNR_ECP5` overrides the path).
+Not yet installed: KiCad (U8).

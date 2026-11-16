@@ -28,8 +28,8 @@ The project has three parts:
 | U4 | Kalman and GRU decoders, session-held-out evaluation | **Done** |
 | U5 | Stimulation artifacts and fixed-point cancellation: R² 0.707 refitted with stimulation against 0.718 without, 2.95 ms recovery | **Done** |
 | U6 | Electrode aging stress test: after 39 simulated weeks the 0.48 µW chain's GRU keeps R² 0.627 behind a 0.00034 µW stabiliser (week 0: 0.720) | **Done** |
-| U7 | RTL (SystemVerilog), bit-exact tests, ECP5 synthesis | Next |
-| U8 | ADS1299 board, saline phantom, stimulator: design for later build | Planned |
+| U7 | RTL (SystemVerilog): bit-exact on 347,904,000 values of real data, 489 LUT4 for 96 channels on the ECP5, about 0.012 µW per channel estimated | **Done** |
+| U8 | ADS1299 board, saline phantom, stimulator: design for later build | Next |
 
 Done-criteria for each unit are in [TODO.md](TODO.md).
 
@@ -510,8 +510,16 @@ Reasoning and prediction checks: [docs/U6_design.md](docs/U6_design.md).
 
 *U5's same-array stimulation shift. A z-score gated by the stimulator cuts the GRU's loss from 0.091 to 0.025, against 0.011 for a decoder refitted with stimulation on.*
 
-### U7: RTL
+### U7: the winning chain in hardware, bit for bit
 
+U7 implements the 0.48 µW chain's digital half, U5's template canceller and
+U2's spiking-band power, in SystemVerilog: one pipelined datapath shared by
+every channel, with each channel's state in RAM. Verilator runs it against the
+integer Python reference on 10 minutes of 96 real Neuralink channels with U5's
+stimulation artifacts added, Yosys and nextpnr place it on a Lattice ECP5
+(LFE5U-25F), and gate-level toggle counts give an ASIC power estimate from
+assumed energies. Nothing ran on hardware, and the placed-and-routed netlist
+was not simulated.
 Reasoning and prediction checks: [docs/U7_design.md](docs/U7_design.md).
 
 <!-- BEGIN U7_RESULTS -->
@@ -530,6 +538,18 @@ Reasoning and prediction checks: [docs/U7_design.md](docs/U7_design.md).
 | Chain budget | 0.488 to 0.493 µW per channel (0.482 to 0.603) | amplifier 0.450 and ADC 0.026 from U3's model; digital from this estimate; radio word 25 bits per bin as built instead of 12; the amplifier is 91% |
 <!-- END U7_RESULTS -->
 
+![One real channel through the RTL and the Python reference, and register widths against bits used](figures/u7_bit_exact.png)
+
+*400 ms of one real channel at the start of a pulse train, stage by stage, with the RTL on the Python line. Across 96 channels × 600 s, 0 of 347,904,000 values differ.*
+
+![LUT4, flip-flops, block RAMs and fmax against channel count on the ECP5](figures/u7_synthesis.png)
+
+*Logic barely grows with channel count because the datapath is shared: 377 LUT4 for one channel, 489 for 96 and 2048, with block RAMs carrying the state. At 96 channels fmax is 49.8 MHz against the 192 kHz needed.*
+
+![Energy per sample by part, digital power under changed assumptions, and the chain budget](figures/u7_power.png)
+
+*Estimated at 0.012 µW per channel (state memory 3.54 of 5.25 pJ per sample), from 0.0012 to 0.122 µW with every assumed constant a tenth to ten times. The chain moves from 0.488 to 0.493 µW; the amplifier is still 91 %.*
+
 ## Reproduce
 
 Requires [uv](https://docs.astral.sh/uv/) and `make`. Python 3.12 is installed
@@ -545,12 +565,18 @@ make u3        # U3 power sweep, figures, metrics and table (about four minutes)
 make u4        # U4 decoders, figures, metrics and table (about three minutes)
 make u5        # U5 figures, metrics, netlist and table (about a minute; needs ngspice, `make mearec` and the Nason data)
 make u6        # U6 aging sweep, figures, metrics and table (about four minutes; needs `make mearec`, the Nason data and both NoMAD sessions)
+make u7        # U7 bit-exactness, ECP5 synthesis, power estimate, figures and table (about 1.5 minutes; needs the Neuralink clips from `make data` or `make u0`, plus Verilator, Yosys and nextpnr-ecp5)
 make u5-key    # U5 key numbers; ARGS="--adapt-shift 1" changes one setting
-make test      # 309 tests; the ones needing data or ngspice skip if absent
+make test      # 437 tests; the ones needing data, ngspice or the RTL tools skip if absent
 ```
 
 U1 needs [ngspice](https://ngspice.sourceforge.io/) (`brew install ngspice`) and
-the Nason files, which have to be downloaded in a browser (see Data).
+the Nason files, which have to be downloaded in a browser (see Data). U7 needs
+[Verilator](https://verilator.org) and [Yosys](https://yosyshq.net/yosys/)
+(`brew install verilator yosys`) and
+[nextpnr-ecp5](https://github.com/YosysHQ/nextpnr), built from source with
+Project Trellis (`brew install prjtrellis`); `NEUROCHAIN_NEXTPNR_ECP5` points
+to the binary if it is not on the path.
 
 `make help` lists every target.
 
@@ -589,11 +615,15 @@ src/neurochain/
   decode/               ridge and Wiener (ridge.py), kalman.py, gru.py, evaluate.py
   analysis/             per-unit analyses and their figures (u3.py: co-design sweep;
                         u4.py: decoder comparison; u5.py: stimulation;
-                        u6.py: aging)
+                        u6.py: aging; u7.py: RTL runs)
+  rtl/                  spec.py (integer reference and word widths), stimulus.py,
+                        tools.py (Verilator, Yosys, nextpnr drivers), energy.py
   viz.py                shared figure style
 scripts/                one script per figure or key number
 tests/                  pytest; no test needs downloaded data unless marked `data`
 docs/                   one design note per unit, plus references
+rtl/                    SystemVerilog chain (nc_sbp_chain.sv and its cores) and
+                        the Verilator testbench (tb/)
 spice/                  reference ngspice netlists (generated; kept in sync by a test)
 figures/  results/      committed outputs, regenerated by make
 ```
@@ -611,6 +641,7 @@ checks: change one parameter, predict the result, then run it.
 - [U4: decoders and evaluation](docs/U4_design.md)
 - [U5: stimulation artifacts](docs/U5_design.md)
 - [U6: aging stress test](docs/U6_design.md)
+- [U7: RTL](docs/U7_design.md)
 - [References](docs/references.md)
 
 ## Safety

@@ -161,10 +161,13 @@ Carried forward from U2:
       U2 gives the first half. Detection F1 and feature tracking are now known
       as functions of noise, bits and sample rate. The second half is turning
       those into a change in the Nason and NoMAD features.
-- [ ] **RTL parameters are fixed** for U7: 14 fractional bits and 6 guard bits
+- [x] **RTL parameters are fixed** for U7: 14 fractional bits and 6 guard bits
       at 30 kS/s (29-bit accumulator); 8 and 2 at 2 kS/s (18-bit accumulator);
       round half up; numerator `b0*(1 - z^-1)^2`. The Python in
       `neurochain.fixedpoint` is the reference the RTL must match bit for bit.
+      (Done in U7: zero mismatches. Correction: at 2 kS/s with the canceller in
+      front the accumulator needs 20 bits, not 18; 18 bits gives 32,474
+      mismatches.)
 - [ ] **MEArec with NEURON 9:** two legacy synapse mechanisms are patched in a
       copy under `data/mearec/` by `scripts/make_mearec.py`. If MEArec or NEURON
       change version, check the patch still applies.
@@ -191,9 +194,10 @@ about zero.
 
 Carried forward from U3:
 
-- [ ] **The winning path for RTL (U7) is SBP:** narrowband amplifier, 8-bit ADC
+- [x] **The winning path for RTL (U7) is SBP:** narrowband amplifier, 8-bit ADC
       at 2 kS/s, high-pass, absolute value, sum over 50 ms. Its fixed-point
-      parameters are in U2's carried-forward list.
+      parameters are in U2's carried-forward list. (Done in U7: in SystemVerilog,
+      489 LUT4 for 96 channels on the ECP5, estimated 0.012 µW per channel.)
 - [ ] **The amplifier is 93 % of the winner's power.** Further savings need a
       lower NEF, not a better ADC or radio. U5 and U6 should report their costs
       in the same µW terms so they can be added to this budget.
@@ -268,10 +272,12 @@ Carried forward from U5:
       is still the safer rule.)
 - [ ] **With a Wiener filter the 0.48 µW chain loses 0.072 R²** under same-array stimulation
       even refitted; the conventional chain loses nothing.
-- [ ] **U7: the RTL reference for the canceller** is `neurochain.stim.cancel.cancel_template`
+- [x] **U7: the RTL reference for the canceller** is `neurochain.stim.cancel.cancel_template`
       (shift 4, 6 fractional template bits, 2 fractional output bits that replace the
       high-pass filter's guard bits, 16 taps at 2 kS/s). The stimulator must share the ADC
-      clock: ±100 µs of jitter breaks the canceller.
+      clock: ±100 µs of jitter breaks the canceller. (Done in U7: the RTL
+      canceller matches it bit for bit; the stimulator starts pulses on a sample
+      edge, at least 16 samples apart.)
 - [ ] **The pulse shape is quoted from memory** of Flesher et al. (2016); the 1 % imbalance,
       1 ms discharge and 0.3 S/m conductivity are assumptions. Verify before quoting.
 - [ ] **Not modelled:** lead-to-lead coupling inside the implant, a nonlinear pseudo-resistor,
@@ -302,7 +308,7 @@ Carried forward from U6:
 - [ ] **3. The aging model only removes spikes**, yet 41 % of real channels fired more;
       R² against simulated weeks is optimistic for real use.
 - [ ] **4. The stabiliser has no integer reference.** If U7 builds it: 17 add or shift
-      steps per bin, 44 register bits per channel.
+      steps per bin, 44 register bits per channel. (U7 did not build it.)
 - [ ] **5. `shift = 10` is a compromise:** `shift 6` gives the GRU 0.637 on Nason (from
       0.627) but 0.594 on NoMAD (from 0.630).
 - [ ] **6. U5's "calibrate with stimulation on" softens:** a gated z-score cuts the GRU's
@@ -315,16 +321,41 @@ Carried forward from U6:
 - [ ] **10. Verify before quoting:** the 2.4 % per month comes from Barrese et al.'s
       summary of Chestek et al., and the Schönemann (1966) DOI is from memory.
 
-## U7: RTL
+## U7: RTL — DONE
 
 Done-criterion: bit-exact on 10 minutes of real data; LUTs, fmax and estimated
 µW per channel reported.
 
-- [ ] Install verilator, yosys, nextpnr-ecp5
-- [ ] SBP extractor and artifact canceller in SystemVerilog
-- [ ] Verilator tests, bit-exact against the fixed-point Python
-- [ ] Yosys and nextpnr for ECP5 (LFE5U-25F)
-- [ ] `docs/U7_design.md`, key-number script, three prediction checks
+- [x] Install verilator, yosys, nextpnr-ecp5: Verilator 5.054, Yosys 0.71 and Project Trellis 1.4 from Homebrew; nextpnr-ecp5 0.11.1 built from source
+- [x] SBP extractor and artifact canceller in SystemVerilog (`rtl/`): one 4-stage pipelined datapath shared by all channels, state in RAM (307 bits per channel), multiplier-free constants by shift and add
+- [x] Verilator tests, bit-exact against the fixed-point Python (`neurochain.rtl.spec.ChainSpec.reference`): 0 mismatches in 347,904,000 values on real data, 0 in 185,472 on a worst-case stimulus, gate-level netlist 0 in 11,596,800
+- [x] Yosys and nextpnr for ECP5 (LFE5U-25F): 7 channel counts from 1 to 2048 plus two `*` variants; toggle-count power estimate (`neurochain.rtl.energy`)
+- [x] `docs/U7_design.md` with three prediction checks, `make u7-key`, `make u7` writes three figures, `results/u7_metrics.json` and the README table
+
+Key number: the SystemVerilog chain matches the integer Python reference on all
+347,904,000 compared values of 96 channels × 10 minutes of real Neuralink
+recordings with stimulation artifacts (zero mismatches), fits the ECP5 LFE5U-25F
+in 489 LUT4, 137 flip-flops and 5 block RAMs at an fmax of 49.8 MHz (192 kHz
+needed), and is estimated at 0.012 µW per channel of digital power, which moves
+the chain's budget from 0.488 to 0.493 µW. U3's placeholder was 0.010 µW; the
+estimate rests on assumed constants (0.0012 to 0.122 µW with each a tenth to ten
+times), not a measurement.
+
+Carried forward from U7:
+
+- [ ] **1. U6's running stabiliser in RTL** needs an integer reference first; not started.
+- [ ] **2. Radio word:** the RTL emits 18 + 7 bits per bin, U3's model sends 12; 1.05 % of
+      bins on this data exceed 12 bits. Choose a format and recheck decoding.
+- [ ] **3. Replace the 20 fJ per memory bit assumption** with a characterised memory, at one
+      supply voltage for logic and memory.
+- [ ] **4. Correct U2's handover** ("18-bit accumulator" at 2 kS/s) to 20 bits.
+- [ ] **5. Clock and memory gating:** with silent input digital power falls only from 0.0122
+      to 0.0096 µW.
+- [ ] **6. Simulate the placed-and-routed netlist and run on a board (U8);** no bitstream
+      was made.
+- [ ] **7. CI has no Verilator, Yosys or nextpnr;** the tool tests skip there.
+- [ ] **8. Verify the Horowitz (2014) energy table** (0.1 pJ per 32-bit add).
+- [ ] **9. One template per stimulation amplitude** (U5's existing carried-forward item).
 
 ## U8: hardware design (for later)
 

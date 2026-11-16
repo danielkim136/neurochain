@@ -219,3 +219,41 @@ first uses them. DOIs were resolved on 2026-11-13.
   `align.procrustes_rotation` (citation from memory; verify the DOI).
 - **Nason, S. R. et al. (2020)** (listed under U0) and **Buccino, A. P. and
   Einevoll, G. T. (2021)** (listed under U2). SBP and the Nason data; MEArec.
+
+## U7: RTL
+
+Verified means the title, venue and the number quoted were confirmed from a
+publisher or repository page during U7. "From memory" means not checked.
+
+- **Meinerzhagen, P., Sherazi, S. M. Y., Burg, A. and Rodrigues, J. N. (2012).**
+  A 500 fW/bit 14 fJ/bit-access 4kb standard-cell based sub-VT memory in 65nm
+  CMOS. *Proc. ESSCIRC*, 321-324.
+  <https://doi.org/10.1109/ESSCIRC.2012.6341319>. The energy per memory bit
+  accessed (14 fJ at 0.5 V) and the leakage per bit (0.5 pW at 0.22 V) behind
+  two constants of `neurochain.rtl.energy.EnergyModel`. Title, venue, DOI and
+  both numbers verified from repository abstracts; the full text was not read,
+  and the author list is from memory.
+- **Horowitz, M. (2014).** Computing's energy problem (and what we can do about
+  it). *IEEE ISSCC Digest of Technical Papers*, 10-14.
+  <https://doi.org/10.1109/ISSCC.2014.6757323>. 0.1 pJ for a 32-bit addition at
+  45 nm and 0.9 V, as a cross-check on the logic energy. Title, venue and DOI
+  verified; the energy figure and the page range are from memory. Verify before
+  quoting.
+- **Kuon, I. and Rose, J. (2007).** Measuring the gap between FPGAs and ASICs.
+  *IEEE Transactions on Computer-Aided Design of Integrated Circuits and
+  Systems* 26(2), 203-215. <https://doi.org/10.1109/TCAD.2006.884574>. Why an
+  FPGA's power is not scaled to an ASIC's here (about 14 times in dynamic power
+  on average; an alternative considered and not used). Title, venue, volume,
+  pages and the factor verified from the abstract; the DOI is from memory.
+- **Hartley, R. I. (1996).** Subexpression sharing in filters using canonic
+  signed digit multipliers. *IEEE Transactions on Circuits and Systems II*
+  43(10), 677-688. <https://doi.org/10.1109/82.539000>. Background for
+  canonical signed-digit constant multiplication; the recoding in
+  `nc_const_mult.sv` is the standard non-adjacent form, checked numerically,
+  not taken from this paper. Citation from memory; verify before quoting.
+- **Widrow, B. et al. (1975)** (listed under U5), **Nason, S. R. et al. (2020)**
+  (listed under U0) and the U5 pulse-shape sources. The canceller is U5's, the
+  feature is Nason's SBP; nothing new is taken from them.
+- **Tools, not papers:** Verilator (<https://verilator.org>), Yosys
+  (<https://yosyshq.net/yosys/>), nextpnr (<https://github.com/YosysHQ/nextpnr>),
+  Project Trellis (<https://github.com/YosysHQ/prjtrellis>).
