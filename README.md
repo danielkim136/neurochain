@@ -510,6 +510,26 @@ Reasoning and prediction checks: [docs/U6_design.md](docs/U6_design.md).
 
 *U5's same-array stimulation shift. A z-score gated by the stimulator cuts the GRU's loss from 0.091 to 0.025, against 0.011 for a decoder refitted with stimulation on.*
 
+### U7: RTL
+
+Reasoning and prediction checks: [docs/U7_design.md](docs/U7_design.md).
+
+<!-- BEGIN U7_RESULTS -->
+| Quantity | Value | How it is defined |
+|---|---|---|
+| RTL against Python | 0 mismatches in 347,904,000 values | 96 channels x 600 s of the Neuralink clips (743 clips; band-passed 300 Hz to 1 kHz, sampled at 2 kS/s, 10-bit codes divided by 4 to 8 bits; no voltage scale), U5's stimulation artifacts added at 100 pulses per second (seed 0); canceller output, blanking flag and filter output per sample, sum and count per 50 ms bin; Verilator 5.054 against `neurochain.rtl.spec.ChainSpec.reference` |
+| Worst-case stimulus | 0 mismatches in 185,472 values; filter output reaches 1535 of a bound of 1536 | codes built to drive every register to the largest value it can hold |
+| Gate-level netlist against RTL | 0 mismatches in 11,596,800 values | Yosys NAND/NOR netlist (2682 gates, 132 flip-flops) simulated on the first 20 s of the same data |
+| Word widths | canceller output 11, filter accumulator 20, filter output 12, bin sum 18 bits; 307 state bits per channel | worst-case bounds derived from the parameters; this data used 11, 19, 11, 14 |
+| ECP5 resources, 96 channels | 489 LUT4, 137 flip-flops, 5 of 56 block RAMs, 0 hard multipliers | Yosys 0.71 (`synth_ecp5 -nodsp`) and nextpnr-ecp5 for a Lattice LFE5U-25F, CABGA256, speed grade 6; 733 of 24,288 logic cells; no hardware in the loop |
+| Fastest clock (fmax) | 49.8 MHz (48.3 to 50.9) | median and range of 3 placement seeds; 96 channels need 192 kHz; the slowest path is 19.6 ns, of which the block RAM's output delay is 5.8 |
+| Other channel counts | 1: 377 LUT4, 0 block RAMs; 8: 449 LUT4, 1 block RAMs; 32: 537 LUT4, 1 block RAMs; 192: 464 LUT4, 8 block RAMs; 1024: 471 LUT4, 20 block RAMs; 2048: 489 LUT4, 39 block RAMs | the same datapath shared by more or fewer channels; one channel alone has its state in flip-flops and LUT RAM |
+| Filter products written as `*` | 762 LUT4, or 290 plus 3 hard multipliers | against 489 with shifts and adds (canonical signed digits) |
+| Digital energy per sample | 5.25 pJ: logic 1.33, clock 0.38, state memory 3.54 | 922 node toggles (gate-level simulation of the real data) and 177 memory bits per sample, times assumed 1.44 fJ per toggle (2 fF at 1.2 V) and 20 fJ per bit; an ASIC estimate, not the FPGA's power |
+| Digital power | 0.0122 µW per channel (0.0012 to 0.122) | dynamic at 2 kS/s plus 0.0017 µW of leakage (assumed 5 pW per gate and per bit); range: every assumed constant a tenth to ten times; the placeholder of U3 and U5 was 0.010 |
+| Chain budget | 0.488 to 0.493 µW per channel (0.482 to 0.603) | amplifier 0.450 and ADC 0.026 from U3's model; digital from this estimate; radio word 25 bits per bin as built instead of 12; the amplifier is 91% |
+<!-- END U7_RESULTS -->
+
 ## Reproduce
 
 Requires [uv](https://docs.astral.sh/uv/) and `make`. Python 3.12 is installed

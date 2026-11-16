@@ -199,6 +199,33 @@ def fixed_sbp(filtered: IntCodes, samples_per_bin: int) -> IntCodes:
     return np.asarray(trimmed.reshape(n_bins, samples_per_bin).sum(axis=1), dtype=np.int64)
 
 
+def fixed_masked_sbp(
+    filtered: IntCodes, valid: NDArray[np.bool_], samples_per_bin: int
+) -> tuple[IntCodes, IntCodes]:
+    """Return each bin's sum of ``|filtered|`` over its valid samples, and their number.
+
+    This is what the implant sends when some samples have been blanked (U5): a
+    sum and a count, both integers. The division that turns them into a mean,
+    as :func:`neurochain.stim.cancel.masked_mean_abs` does in floating point,
+    happens off the implant, so the RTL needs no divider.
+
+    Args:
+        filtered: ``(..., n_samples)`` filter output.
+        valid: Mask of the same shape, false on blanked samples.
+        samples_per_bin: Samples in one feature bin.
+
+    Returns:
+        ``(sums, counts)``, each ``(..., n_bins)``; an incomplete last bin is
+        dropped.
+    """
+    n_bins = filtered.shape[-1] // samples_per_bin
+    shape = (*filtered.shape[:-1], n_bins, samples_per_bin)
+    keep = valid[..., : n_bins * samples_per_bin].reshape(shape)
+    magnitude = np.abs(filtered[..., : n_bins * samples_per_bin].astype(np.int64)).reshape(shape)
+    sums = np.where(keep, magnitude, 0).sum(axis=-1)
+    return np.asarray(sums, dtype=np.int64), np.asarray(keep.sum(axis=-1), dtype=np.int64)
+
+
 def quantisation_snr_db(reference: FloatArray, fixed: NDArray[Any]) -> float:
     """Return how far a fixed-point output is from its floating-point reference, in dB."""
     error = np.asarray(fixed, dtype=np.float64) - reference

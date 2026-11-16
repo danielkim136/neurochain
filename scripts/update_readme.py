@@ -824,6 +824,135 @@ def u6_table(m: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def u7_table(m: dict[str, Any]) -> str:
+    """Build the U7 results table from ``results/u7_metrics.json``."""
+    stim, real, worst, gate = m["stimulus"], m["bit_exact"], m["worst_case"], m["gate_level"]
+    synth, power, key, tools = m["synthesis"], m["power"], m["key"], m["tools"]
+    widths = {w["node"]: w for w in m["widths"]}
+    rows = {r["n_channels"]: r for r in synth["sweep"] if "error" not in r}
+    own = rows[key["n_channels"]]
+    if stim.get("source") == "neuralink":
+        data = (
+            f"{real['n_channels']} channels x {real['seconds']:.0f} s of the Neuralink clips "
+            f"({stim['n_clips']} clips; band-passed {stim['band_hz'][0]:g} Hz to "
+            f"{stim['band_hz'][1] / 1000:g} kHz, sampled at 2 kS/s, 10-bit codes divided by 4 to "
+            f"8 bits; no voltage scale), U5's stimulation artifacts added at "
+            f"{stim['pulse_rate_hz']:.0f} pulses per second (seed {stim['seed']})"
+        )
+    else:
+        data = (
+            f"{real['n_channels']} channels x {real['seconds']:.0f} s of {stim.get('source')} codes"
+        )
+    order = ("canceller output", "filter accumulator", "filter output", "bin sum")
+    out: list[tuple[str, str, str]] = [
+        (
+            "RTL against Python",
+            f"{real['total_mismatches']} mismatches in {real['values_compared']:,} values",
+            f"{data}; canceller output, blanking flag and filter output per sample, sum and "
+            f"count per 50 ms bin; Verilator {tools.get('verilator', '?')} against "
+            "`neurochain.rtl.spec.ChainSpec.reference`",
+        ),
+        (
+            "Worst-case stimulus",
+            f"{worst['total_mismatches']} mismatches in {worst['values_compared']:,} values; "
+            f"filter output reaches {widths['filter output']['peak_worst_case']} of a bound of "
+            f"{widths['filter output']['bound']}",
+            "codes built to drive every register to the largest value it can hold",
+        ),
+        (
+            "Gate-level netlist against RTL",
+            f"{gate['mismatches_against_rtl']} mismatches in {gate['values_compared']:,} values",
+            f"Yosys NAND/NOR netlist ({gate['gates']['gates']} gates, "
+            f"{gate['gates']['flip_flops']} flip-flops) simulated on the first "
+            f"{gate['seconds']:.0f} s of the same data",
+        ),
+        (
+            "Word widths",
+            ", ".join(f"{name} {widths[name]['bits']}" for name in order)
+            + f" bits; {m['state_bits']['total']} state bits per channel",
+            "worst-case bounds derived from the parameters; this data used "
+            + ", ".join(str(widths[name]["bits_used_real"]) for name in order),
+        ),
+        (
+            f"ECP5 resources, {key['n_channels']} channels",
+            f"{own['lut4']} LUT4, {own['flip_flops']} flip-flops, {own['block_rams']} of "
+            f"{own['block_rams_available']} block RAMs, {own['multipliers']} hard multipliers",
+            f"Yosys {tools.get('yosys', '?')} (`synth_ecp5 -nodsp`) and nextpnr-ecp5 for a "
+            f"Lattice {synth['device']}, {synth['package']}, speed grade {synth['speed_grade']}; "
+            f"{own['logic_cells']} of {own['logic_cells_available']:,} logic cells; no hardware "
+            "in the loop",
+        ),
+        (
+            "Fastest clock (fmax)",
+            f"{own['fmax_median_mhz']:.1f} MHz ({min(own['fmax_mhz']):.1f} to "
+            f"{max(own['fmax_mhz']):.1f})",
+            f"median and range of {len(own['seeds'])} placement seeds; {key['n_channels']} "
+            f"channels need {own['clock_needed_hz'] / 1000:.0f} kHz; the slowest path is "
+            f"{own['critical_path'].get('delay_ns', float('nan')):.1f} ns, of which the block "
+            f"RAM's output delay is {own['critical_path'].get('clk_to_q_ns', float('nan')):.1f}",
+        ),
+    ]
+    others = [n for n in rows if n != key["n_channels"]]
+    if others:
+        out.append(
+            (
+                "Other channel counts",
+                "; ".join(
+                    f"{n}: {rows[n]['lut4']} LUT4, {rows[n]['block_rams']} block RAMs"
+                    for n in others
+                ),
+                "the same datapath shared by more or fewer channels; one channel alone has "
+                "its state in flip-flops and LUT RAM",
+            )
+        )
+    star = synth["variants"]
+    if "error" not in star["star_lut"] and "error" not in star["star_dsp"]:
+        out.append(
+            (
+                "Filter products written as `*`",
+                f"{star['star_lut']['lut4']} LUT4, or {star['star_dsp']['lut4']} plus "
+                f"{star['star_dsp']['multipliers']} hard multipliers",
+                f"against {own['lut4']} with shifts and adds (canonical signed digits)",
+            )
+        )
+    energy, measured, assumed = power["energy"], power["measured"], power["assumptions"]
+    budget = power["budget"]
+    out += [
+        (
+            "Digital energy per sample",
+            f"{energy['dynamic_pj']:.2f} pJ: logic {energy['logic_pj']:.2f}, clock "
+            f"{energy['clock_pj']:.2f}, state memory {energy['memory_pj']:.2f}",
+            f"{measured['toggles_per_sample']:.0f} node toggles (gate-level simulation of the "
+            f"real data) and {measured['memory_bits_per_sample']:.0f} memory bits per sample, "
+            f"times assumed {assumed['toggle_fj']:.2f} fJ per toggle "
+            f"({assumed['c_node_f'] * 1e15:g} fF at {assumed['v_supply_v']:g} V) and "
+            f"{assumed['memory_j_per_bit'] * 1e15:g} fJ per bit; an ASIC estimate, not the "
+            "FPGA's power",
+        ),
+        (
+            "Digital power",
+            f"{energy['total_uw']:.4f} µW per channel ({key['digital_low_uw']:.4f} to "
+            f"{key['digital_high_uw']:.3f})",
+            f"dynamic at 2 kS/s plus {energy['leakage_uw']:.4f} µW of leakage (assumed "
+            f"{assumed['gate_leakage_w'] * 1e12:g} pW per gate and per bit); range: every "
+            f"assumed constant a tenth to ten times; the placeholder of U3 and U5 was "
+            f"{power['placeholder']['total_uw']:.3f}",
+        ),
+        (
+            "Chain budget",
+            f"{budget['before_uw']:.3f} to {budget['after_uw']:.3f} µW per channel "
+            f"({budget['after_low_uw']:.3f} to {budget['after_high_uw']:.3f})",
+            f"amplifier {budget['lna_uw']:.3f} and ADC {budget['adc_uw']:.3f} from U3's model; "
+            f"digital from this estimate; radio word {power['radio']['bits_per_bin_rtl']} bits "
+            f"per bin as built instead of {power['radio']['bits_per_bin_model']:.0f}; the "
+            f"amplifier is {budget['lna_share']:.0%}",
+        ),
+    ]
+    lines = ["| Quantity | Value | How it is defined |", "|---|---|---|"]
+    lines += [f"| {name} | {value} | {note} |" for name, value, note in out]
+    return "\n".join(lines)
+
+
 TABLES = {
     "U0_RESULTS": ("u0_metrics.json", u0_table),
     "U1_RESULTS": ("u1_metrics.json", u1_table),
@@ -832,6 +961,7 @@ TABLES = {
     "U4_RESULTS": ("u4_metrics.json", u4_table),
     "U5_RESULTS": ("u5_metrics.json", u5_table),
     "U6_RESULTS": ("u6_metrics.json", u6_table),
+    "U7_RESULTS": ("u7_metrics.json", u7_table),
 }
 
 
