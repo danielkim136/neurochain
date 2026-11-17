@@ -1,6 +1,6 @@
 # NeuroChain: one command per result. Run `make help` for the list.
 .DEFAULT_GOAL := help
-.PHONY: help setup data data-status data-describe mearec u0 u1 u1-key u2 u2-key u3 u3-key u4 u4-key u5 u5-key u6 u6-key u7 u7-key u0-key readme test test-fast lint format clean
+.PHONY: help setup data data-status data-describe mearec u0 u1 u1-key u2 u2-key u3 u3-key u4 u4-key u5 u5-key u6 u6-key u7 u7-key u0-key readme site test test-fast lint format clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-12s %s\n", $$1, $$2}'
@@ -89,6 +89,9 @@ u7-key: ## U7: print the key numbers (add ARGS="--acc-bits 18" to change one set
 
 readme: ## Regenerate the README results tables from results/*.json
 	uv run python scripts/update_readme.py
+
+site: ## Build the results website from results/*.json into build/site/index.html (no data needed)
+	uv run python scripts/build_site.py
 
 test: ## Run every test (real-data tests skip if the data is absent)
 	uv run pytest --cov=neurochain --cov-report=term-missing:skip-covered

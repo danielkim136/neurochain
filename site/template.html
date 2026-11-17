@@ -1,0 +1,256 @@
+<title>NeuroChain</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Neural sensing at {{low_uw}} µW per channel: the lowest-power chain that still decodes while the implant stimulates and its electrodes age, with models, measurements and RTL.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<!-- BODY -->
+<header class="top">
+  <div class="wrap top-row">
+    <a class="brand" href="#top"><span class="mark" aria-hidden="true"></span>NeuroChain</a>
+    <nav aria-label="Sections">
+      <a href="#chain">Power</a>
+      <a href="#decoders">Decoders</a>
+      <a href="#stimulation">Stimulation</a>
+      <a href="#aging">Aging</a>
+      <a href="#rtl">RTL</a>
+      <a href="#reproduce">Reproduce</a>
+    </nav>
+    <a class="top-link" href="{{repo_url}}">GitHub</a>
+  </div>
+</header>
+
+<main id="top">
+<section class="hero wrap">
+  <div class="hero-text">
+    <p class="meta">Neural sensing chain · open source · every figure generated from the repository</p>
+    <h1>Neural sensing at {{low_uw}} µW per channel, {{power_ratio}} times less than a conventional chain</h1>
+    <p class="sub">NeuroChain models the electrode, amplifier, ADC, feature and decoder under one power model, picks the cheapest chain that still decodes, then tests it against stimulation artifacts, electrode aging and a bit-exact RTL build.</p>
+    <dl class="specs">
+      <div><dt>Power per channel<span>{{low_label}}</span></dt><dd>{{low_uw}} µW</dd></div>
+      <div><dt>Conventional chain<span>{{conv_label}}</span></dt><dd>{{conv_uw}} µW</dd></div>
+      <div><dt>GRU R², finger velocity<span>Nason, held out; conventional chain {{gru_conv_r2}}</span></dt><dd>{{gru_low_r2}}</dd></div>
+      <div><dt>Recovery after a pulse<span>{{example_mv}} mV artifact, to ±{{recovery_threshold_uv}} µV; ngspice {{recovery_low_spice_ms}} ms</span></dt><dd>{{recovery_low_ms}} ms</dd></div>
+      <div><dt>RTL against Python<span>{{rtl_values}} values, {{rtl_channels}} channels × {{rtl_seconds}} s</span></dt><dd>{{rtl_mismatches}} mismatches</dd></div>
+    </dl>
+    <div class="actions">
+      <a class="btn" href="{{repo_url}}">View the code</a>
+      <a class="text-link" href="#reproduce">Reproduce the results</a>
+    </div>
+  </div>
+  <figure class="hero-fig">
+    <div class="fig-head">
+      <p><span class="fig-no">Figure 1</span>Accuracy against power, {{n_configs}} chains</p>
+      <select id="pareto-dataset" aria-label="Dataset"></select>
+    </div>
+    <div class="chart" id="pareto-chart" aria-label="Held-out R² against µW per channel"></div>
+    <p class="cond"><span>Conditions</span>ridge readout · 5 contiguous folds · mean of 3 noise repeats · log power axis</p>
+  </figure>
+</section>
+
+<section id="chain" class="wrap band">
+  <div class="section-head">
+    <p class="meta">U3 · Co-design</p>
+    <h2>Where the power goes</h2>
+    <p>Figure 1 prices {{n_configs}} chain configurations (feature, amplifier current, ADC bits and sample rate; {{n_infeasible}} more cannot reach their band). The marked point is the cheapest chain within {{tolerance}} of the conventional chain's R². The amplifier is {{amp_share}} of the conventional chain, so that is where the saving comes from: spiking-band power (SBP) needs only a 300 Hz to 1 kHz band, which lets the amplifier run at 0.25 µA and the ADC at 2 kS/s.</p>
+  </div>
+  <div class="table-wrap">
+    <table class="spec-table">
+      <thead><tr><th scope="col">Chain</th><th scope="col">Amplifier</th><th scope="col">ADC</th><th scope="col">Feature logic</th><th scope="col">Radio</th><th scope="col">Total, µW</th></tr></thead>
+      <tbody>
+        <tr class="is-low"><th scope="row">Selected<span>{{low_label}} · {{low_bps}} bit/s</span></th><td>{{low_amp}}</td><td>{{low_adc}}</td><td>{{low_dsp}}</td><td>{{low_link}}</td><td class="total">{{low_uw}}</td></tr>
+        <tr><th scope="row">Conventional<span>{{conv_label}} · {{conv_bps}} bit/s</span></th><td>{{conv_amp}}</td><td>{{conv_adc}}</td><td>{{conv_dsp}}</td><td>{{conv_link}}</td><td class="total">{{conv_uw}}</td></tr>
+        <tr><th scope="row">Stream every sample<span>{{raw_label}} · {{raw_bps}} bit/s</span></th><td>{{raw_amp}}</td><td>{{raw_adc}}</td><td>{{raw_dsp}}</td><td>{{raw_link}}</td><td class="total">{{raw_uw}}</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="cond"><span>Conditions</span>µW per channel · NEF {{nef}} at {{v_supply}} V · ADC {{adc_fom_fj}} fJ per step · {{multiply_pj}} pJ per operation · {{bit_pj}} pJ per radio bit · each constant an assumption, checked against tenfold changes</p>
+  <figure class="scale-bars" aria-label="Total power to scale">
+    <div class="bar-row is-low"><span>Selected</span><div class="track"><i class="fill" style="width: {{low_pct}}%"></i></div><b>{{low_uw}} µW</b></div>
+    <div class="bar-row"><span>Conventional</span><div class="track"><i class="fill" style="width: {{conv_pct}}%"></i></div><b>{{conv_uw}} µW</b></div>
+    <div class="bar-row"><span>Stream every sample</span><div class="track"><i class="fill" style="width: {{raw_pct}}%"></i></div><b>{{raw_uw}} µW</b></div>
+  </figure>
+  <p class="caption">On NoMAD, which records threshold crossings only, the cheapest matching chain needs {{s2_low_uw}} µW on session 2 ({{s2_ratio}} times less) and {{s1_low_uw}} µW on session 1 ({{s1_ratio}} times less). <a href="{{repo_url}}/blob/main/docs/U3_design.md">U3 design note</a></p>
+  <details class="method">
+    <summary>How a chain's effect reaches recorded data</summary>
+    <p>Public datasets come from one chain. To score another, a bridge measured on a MEArec simulation with ground truth carries its effect onto the recorded features: crossings are thinned by the share of real spikes the cheaper chain keeps, and SBP gets the extra noise power. The bridge was checked at {{bridge_ua}} µA, where the cheaper chain can be simulated directly: crossings correlate r = {{bridge_cross_actual}} with true spike counts (bridge predicts {{bridge_cross_predicted}}), SBP {{bridge_sbp_actual}} (bridge predicts {{bridge_sbp_predicted}}).</p>
+  </details>
+</section>
+
+<section id="decoders" class="wrap band">
+  <div class="section-head">
+    <p class="meta">U4 · Decoders</p>
+    <h2>Does the choice survive better decoders?</h2>
+    <p>Four causal decoders, each scored on {{n_folds}} contiguous held-out blocks. On Nason, the {{gru_hidden}}-unit GRU decodes the selected chain to R² {{gru_low_r2}} against {{gru_conv_r2}} for the conventional one. The paired difference, {{gru_diff}} [{{gru_diff_low}}, {{gru_diff_high}}], includes zero. Run on the implant, the GRU would cost about {{gru_uw}} µW per channel.</p>
+  </div>
+  <figure class="fig">
+    <div class="fig-head">
+      <p><span class="fig-no">Figure 2</span>Held-out R² per decoder, both chains</p>
+      <select id="dec-dataset" aria-label="Dataset"></select>
+    </div>
+    <div class="chart" id="dec-chart" aria-label="Held-out R² per decoder, both chains"></div>
+    <p class="cond"><span>Conditions</span>{{n_folds}} contiguous folds · 95 % intervals from {{n_boot}} resamples of trials · Δ is paired, selected minus conventional</p>
+  </figure>
+  <figure class="fig">
+    <div class="fig-head">
+      <p><span class="fig-no">Figure 3</span>Decoded against true finger velocity</p>
+      <div class="seg" id="trace-pick" role="group" aria-label="Decoder"></div>
+    </div>
+    <div class="chart" id="trace-chart" aria-label="Decoded against true finger velocity"></div>
+    <p class="cond" id="trace-caption"></p>
+  </figure>
+</section>
+
+<section id="stimulation" class="wrap band">
+  <div class="section-head">
+    <p class="meta">U5 · Recording while stimulating</p>
+    <h2>A millivolt artifact on a microvolt signal</h2>
+    <p>A {{pulse_ua}} µA, {{pulse_us}} µs biphasic pulse at {{pulse_rate}} pulses per second puts a median {{artifact_mv}} mV ({{artifact_min_mv}} to {{artifact_max_mv}}) on every electrode of its own array, past the ADC's ±{{adc_range_mv}} mV on all of them. The selected chain's front end recovers within ±{{recovery_threshold_uv}} µV in {{recovery_low_ms}} ms (conventional: {{recovery_conv_ms}} ms). Blanking then drops the affected samples, or a multiplier-free adaptive template canceller subtracts a learned artifact for {{canceller_uw}} µW and {{canceller_bits}} bits per channel.</p>
+  </div>
+  <figure class="fig">
+    <div class="fig-head">
+      <p><span class="fig-no">Figure 4</span>A real channel through each treatment</p>
+      <div class="seg" id="stim-pick" role="group" aria-label="Treatment"></div>
+    </div>
+    <div class="chart" id="stim-chart" aria-label="Real channel with stimulation artifacts, before and after treatment"></div>
+    <p class="cond"><span>Conditions</span>Nason in-vivo channel · 2 kS/s, 8 b over ±1 mV · {{example_mv}} mV artifact at each pulse · µV at the electrode · gaps are samples marked invalid</p>
+    <p class="caption">On this channel, SBP moves by {{in_vivo_bias_none}} noise floors untreated and {{in_vivo_bias_template}} with the canceller.</p>
+  </figure>
+  <figure class="fig">
+    <div class="fig-head">
+      <p><span class="fig-no">Figure 5</span>GRU R² on stimulated bins</p>
+    </div>
+    <div class="chart" id="stim-r2" aria-label="GRU R² on stimulated bins by treatment"></div>
+    <p class="cond"><span>Conditions</span>Nason held-out folds · stimulating electrode on the same array · 95 % intervals from resampled trials · dashed: no stimulation</p>
+    <p class="caption">With the canceller and a decoder refitted with stimulation on, the selected chain loses {{stim_template_refit_loss}} [{{stim_template_refit_loss_low}}, {{stim_template_refit_loss_high}}] of its R² ({{stim_clean_r2}} without stimulation). <a href="{{repo_url}}/blob/main/docs/U5_design.md">U5 design note</a></p>
+  </figure>
+</section>
+
+<section id="aging" class="wrap band">
+  <div class="section-head">
+    <p class="meta">U6 · Aging stress test</p>
+    <h2>Decoding through an aging electrode</h2>
+    <p>Encapsulation raises |Z| at 1 kHz from {{z_fresh_kohm}} to {{z_aged_kohm}} kΩ ({{impedance_rise}} times, within two weeks) and front-end noise from {{noise_fresh_uv}} to {{noise_aged_uv}} µV, while spike amplitude falls about {{decline_per_month}} a month. Decoders fitted at week 0 are tested on held-out blocks aged by the model. A running z-score ({{stabiliser_uw}} µW, {{stabiliser_bits}} register bits per channel) recovers most of the loss without refitting. Every aging parameter is an assumption, so the second table changes them one at a time.</p>
+  </div>
+  <figure class="fig">
+    <div class="fig-head">
+      <p><span class="fig-no">Figure 6</span>R² against simulated weeks</p>
+      <div class="fig-controls">
+        <select id="age-condition" aria-label="Chain and data"></select>
+        <select id="age-decoder" aria-label="Decoder"></select>
+      </div>
+    </div>
+    <div class="chart" id="age-chart" aria-label="R² against simulated weeks"></div>
+    <p class="cond"><span>Conditions</span>decoder fitted at week 0 · week {{key_week}} matches NoMAD's real gap of {{days_apart}} days · bands are 95 % intervals from resampled trials</p>
+    <p class="caption">At week {{key_week}} on Nason with the GRU, the selected chain keeps R² {{age_low_zscore}} with the stabiliser ({{age_low_gain}} [{{age_low_gain_low}}, {{age_low_gain_high}}] over leaving it alone). The conventional chain keeps {{age_conv_zscore}} ({{age_conv_gain}}).</p>
+  </figure>
+  <div class="two-col">
+    <div>
+      <h3>Table 1. The one real gap</h3>
+      <p>NoMAD's two sessions, recorded {{days_apart}} days apart from the same BrainGate participant: R² of a decoder fitted on the earlier session and tested on the later one. Alignment maps both sessions onto {{n_latents}} shared latent axes, found from the first {{calibration_s}} s without labels.</p>
+      <div class="table-wrap">{{table_session_pair}}</div>
+    </div>
+    <div>
+      <h3>Table 2. Changed assumptions</h3>
+      <p>GRU on Nason at week {{key_week}}, R², with each of the {{n_variations}} assumptions changed on its own.</p>
+      <div class="table-wrap">{{table_variations}}</div>
+    </div>
+  </div>
+</section>
+
+<section id="rtl" class="wrap band">
+  <div class="section-head">
+    <p class="meta">U7 · Hardware</p>
+    <h2>The selected chain in RTL, bit for bit</h2>
+    <p>The digital half of the chain (template canceller, high-pass filter, SBP binning) in SystemVerilog: one pipelined datapath shared by all channels, with {{rtl_state_bits}} bits of state per channel in RAM. Nothing ran on a board, and the placed-and-routed netlist was not simulated.</p>
+  </div>
+  <div class="table-wrap">
+    <table class="spec-table">
+      <thead><tr><th scope="col">Parameter</th><th scope="col">Value</th><th scope="col">Conditions</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">RTL against Python</th><td>{{rtl_mismatches}} mismatches</td><td class="c">{{rtl_values}} values; {{rtl_channels}} Neuralink channels × {{rtl_seconds}} s with artifacts; Verilator {{verilator}}</td></tr>
+        <tr><th scope="row">Gate-level netlist against RTL</th><td>{{rtl_gate_mismatches}} mismatches</td><td class="c">{{rtl_gate_values}} values; Yosys netlist of {{rtl_gates}} gates</td></tr>
+        <tr><th scope="row">Logic</th><td>{{rtl_lut4}} LUT4</td><td class="c">{{rtl_device}}, {{rtl_channels}} channels; {{rtl_cells}} of {{rtl_cells_available}} cells, {{rtl_bram}} of {{rtl_bram_available}} block RAMs, no multipliers</td></tr>
+        <tr><th scope="row">Fastest clock</th><td>{{rtl_fmax}} MHz</td><td class="c">{{rtl_fmax_low}} to {{rtl_fmax_high}} over 3 placement seeds; {{rtl_channels}} channels need {{rtl_clock_khz}} kHz</td></tr>
+        <tr><th scope="row">Digital power</th><td>{{digital_uw}} µW</td><td class="c">ASIC estimate from gate-level toggles; {{digital_low_uw}} to {{digital_high_uw}} with each assumed energy a tenth to ten times</td></tr>
+        <tr class="is-low"><th scope="row">Whole chain</th><td>{{budget_uw}} µW</td><td class="c">{{budget_low_uw}} to {{budget_high_uw}}; the amplifier is {{budget_amp_share}}</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <figure class="fig">
+    <div class="fig-head">
+      <p><span class="fig-no">Figure 7</span>The RTL canceller on a real channel</p>
+    </div>
+    <div class="chart" id="rtl-chart" aria-label="ADC codes and canceller output from the RTL"></div>
+    <p class="cond" id="rtl-caption"></p>
+  </figure>
+  <details class="method">
+    <summary>Synthesis at other channel counts</summary>
+    <div class="table-wrap">{{table_channels}}</div>
+    <p>Yosys <code>synth_ecp5 -nodsp</code> and nextpnr-ecp5 for a Lattice LFE5U-25F, CABGA256, speed grade 6. The power figure comes from gate-level toggle counts times assumed energies (2 fF per node at 1.2 V, 20 fJ per memory bit), so it is not FPGA power.</p>
+  </details>
+</section>
+
+<section id="groundwork" class="wrap band">
+  <div class="section-head">
+    <p class="meta">U0 to U2 · Groundwork</p>
+    <h2>The measurements the choice rests on</h2>
+  </div>
+  <ul class="facts">
+    <li><b>Real implant noise.</b> {{u0_clips}} clean Neuralink clips: median spike-band noise {{u0_sigma_lsb}} LSB, and {{u0_lfp_share}} of the power sits below 300 Hz. <a href="{{repo_url}}/blob/main/docs/U0_design.md">U0</a></li>
+    <li><b>Front-end noise three ways.</b> Hand calculation, analytic model and ngspice give {{u1_noise_hand}}, {{u1_noise_analytic}} and {{u1_noise_spice}} µV rms (300 Hz to 7.5 kHz, referred to tissue), within {{u1_disagreement}} of each other. Electrode {{u1_z_kohm}} kΩ at 1 kHz with a constant-phase double layer; NEF {{u1_nef}}. <a href="{{repo_url}}/blob/main/docs/U1_design.md">U1</a></li>
+    <li><b>How few ADC bits.</b> On a MEArec ground-truth recording at {{u2_noise_uv}} µV background noise, spike-detection F1 holds at {{u2_f1_10b}} at 10 bits and {{u2_f1_6b}} at 6, then drops to {{u2_f1_5b}} at 5. <a href="{{repo_url}}/blob/main/docs/U2_design.md">U2</a></li>
+    <li><b>No decoder survives the session gap untouched.</b> A fixed ridge readout across NoMAD's sessions scores R² {{fixed_cross_a}} and {{fixed_cross_b}}, which is why aging gets its own unit.</li>
+  </ul>
+</section>
+
+<section id="reproduce" class="wrap band">
+  <div class="section-head">
+    <p class="meta">For other researchers</p>
+    <h2>Reproduce, reuse, check</h2>
+    <p>Each figure and number comes from one <code>make</code> target with a fixed seed. The datasets are public, download with SHA-256 checks and are never committed.</p>
+  </div>
+  <div class="two-col">
+    <div>
+      <h3>Run it</h3>
+<pre class="code"><code>git clone {{repo_url}}
+cd neurochain
+make setup        # uv sync + pre-commit
+make data         # download and verify
+make u3           # Pareto sweep, ~4 min
+make u3-key ARGS="--nef 2"
+make site         # this page</code></pre>
+      <h3>Datasets</h3>
+      <ul class="plain">
+        <li><a href="https://doi.org/10.7302/wwya-5q86">Nason et al., SBP data</a>, Deep Blue, CC BY-NC 4.0: 96 channels, finger kinematics</li>
+        <li><a href="https://doi.org/10.5061/dryad.q83bk3jtp">NoMAD sessions</a>, Dryad: 192 channels, two sessions {{days_apart}} days apart</li>
+        <li><a href="https://content.neuralink.com/compression-challenge/README.html">Neuralink compression challenge</a>: 743 raw N1 clips in ADC LSB, no published gain</li>
+        <li><a href="https://github.com/SpikeInterface/MEArec">MEArec</a>: simulated ground truth, generated locally</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Pieces you can lift</h3>
+      <ul class="plain">
+        <li><code>neurochain.frontend</code>: Randles electrode with a constant-phase element, amplifier noise model, causal front-end emulator, ngspice netlist generator</li>
+        <li><code>neurochain.power</code>: per-stage µW model for amplifier, ADC, logic and radio</li>
+        <li><code>neurochain.bridge</code>: carries a cheaper chain's effect onto recorded features</li>
+        <li><code>neurochain.stim</code>: artifact propagation, saturation model and fixed-point template canceller</li>
+        <li><code>neurochain.stabilise</code>: running z-score with shift-only arithmetic</li>
+        <li><code>rtl/</code>: SystemVerilog chain with a Verilator bit-exactness harness</li>
+      </ul>
+      <h3>What this does not show</h3>
+      <ul class="plain">
+        <li>No hardware yet. The board, saline phantom and stimulator are the next unit.</li>
+        <li>Power constants and aging parameters are assumptions from the literature. They are varied, not measured.</li>
+        <li>Most chains are scored through the bridge, not recorded directly.</li>
+        <li>NoMAD's two sessions are the only measured long-term gap.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="wrap foot">
+  <p>NeuroChain is a student project in electrical engineering. Code, design notes and every result file: <a href="{{repo_url}}">{{repo_url}}</a>. Sources for each method are in <a href="{{repo_url}}/blob/main/docs/references.md">docs/references.md</a>.</p>
+</footer>
+<div class="tip" id="tip" role="tooltip" hidden></div>

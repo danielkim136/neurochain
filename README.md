@@ -17,6 +17,9 @@ The project has three parts:
   front-end saturation and recovery, and fixed-point adaptive cancellation.
 - **C, aging stress test.** Simulated electrode aging on held-out sessions.
 
+**Interactive results:** <https://danielkim136.github.io/neurochain/> (built from
+`results/*.json` by `make site`; see [docs/site_design.md](docs/site_design.md)).
+
 ## Status
 
 | Unit | What it delivers | State |
@@ -567,7 +570,8 @@ make u5        # U5 figures, metrics, netlist and table (about a minute; needs n
 make u6        # U6 aging sweep, figures, metrics and table (about four minutes; needs `make mearec`, the Nason data and both NoMAD sessions)
 make u7        # U7 bit-exactness, ECP5 synthesis, power estimate, figures and table (about 1.5 minutes; needs the Neuralink clips from `make data` or `make u0`, plus Verilator, Yosys and nextpnr-ecp5)
 make u5-key    # U5 key numbers; ARGS="--adapt-shift 1" changes one setting
-make test      # 437 tests; the ones needing data, ngspice or the RTL tools skip if absent
+make site      # interactive results page in build/site/index.html (no data needed)
+make test      # 443 tests; the ones needing data, ngspice or the RTL tools skip if absent
 ```
 
 U1 needs [ngspice](https://ngspice.sourceforge.io/) (`brew install ngspice`) and
